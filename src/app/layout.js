@@ -1,7 +1,8 @@
 import "./globals.css";
 import { Inter, Manrope } from "next/font/google";
+import AppLayout from "@/shared/components/layout/AppLayout";
+import AuthProvider from "@/core/auth/AuthProvider";
 import GlobalToastHost from "@/shared/components/ui/GlobalToastHost";
-import QueryProvider from "@/providers/QueryProvider";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -24,10 +25,10 @@ export default function RootLayout({ children }) {
   return (
     <html lang="en" className={`${inter.variable} ${manrope.variable}`}>
       <body className="dense-workspace">
-        <QueryProvider>
+        <AuthProvider>
           <GlobalToastHost />
-          {children}
-        </QueryProvider>
+          <AppLayout>{children}</AppLayout>
+        </AuthProvider>
       </body>
     </html>
   );

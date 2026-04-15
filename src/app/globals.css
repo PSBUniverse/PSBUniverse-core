@@ -266,3 +266,62 @@
     align-items: flex-start;
   }
 }
+
+.psb-page-container {
+  width: 100%;
+}
+
+.psb-ui-button {
+  font-weight: 600;
+}
+
+.psb-ui-card {
+  border: 1px solid #d3e0ea;
+  box-shadow: 0 8px 22px rgba(18, 53, 81, 0.08);
+}
+
+.psb-ui-card-header {
+  background: #f6faff;
+  border-bottom: 1px solid #d8e4ee;
+}
+
+.psb-ui-card-title {
+  color: #163d5a;
+  font-size: 1rem;
+  font-weight: 700;
+}
+
+.psb-ui-card-subtitle {
+  color: #61788d;
+  font-size: 0.8rem;
+}
+
+.psb-ui-card-body {
+  padding: 0.9rem;
+}
+
+.psb-ui-table {
+  margin-bottom: 0;
+}
+
+.psb-ui-table thead th {
+  background: #f6faff;
+  color: #5f7386;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-size: 0.68rem;
+  font-weight: 700;
+}
+
+.psb-ui-badge {
+  font-weight: 700;
+}
+
+.psb-ui-input {
+  border-color: #bfd0df;
+}
+
+.psb-ui-input:focus {
+  border-color: #2172a0;
+  box-shadow: 0 0 0 0.2rem rgba(33, 114, 160, 0.18);
+}

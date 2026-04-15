@@ -25,7 +25,7 @@ Then set these values in `.env.local`:
 
 - `NEXT_PUBLIC_SUPABASE_URL`
 - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
-- `SUPABASE_SERVICE_ROLE_KEY` (server-only, required for login API)
+- `SUPABASE_SERVICE_ROLE_KEY` (server-only, required for admin-only server workflows)
 
 Run the development server:
 
@@ -43,14 +43,15 @@ This project uses [`next/font`](https://nextjs.org/docs/app/building-your-applic
 
 Beginner-proof documentation is available in the `docs/` folder.
 
-- [Docs Index (Day 1/2/3 Path)](docs/README.md)
+- [Docs Index](docs/README.md)
 - [Project Overview](docs/PROJECT_OVERVIEW.md)
-- [Know Your Shell](docs/KNOW_YOUR_SHELL.md)
-- [How To Create Module](docs/HOW_TO_CREATE_MODULE.md)
-- [CRUD Supabase](docs/CRUD_SUPABASE.md)
-- [Routing Guide](docs/ROUTING_GUIDE.md)
-- [File Usage Guide](docs/FILE_USAGE_GUIDE.md)
+- [Core Usage Guide](docs/CORE_USAGE_GUIDE.md)
+- [Module Development Guide](docs/MODULE_DEVELOPMENT_GUIDE.md)
+- [Module Routing Guide](docs/MODULE_ROUTING_GUIDE.md)
+- [Supabase CRUD Guide](docs/SUPABASE_CRUD_GUIDE.md)
+- [Database Naming Conventions](docs/DATABASE_NAMING_CONVENTIONS.md)
 - [Styling Guide](docs/STYLING_GUIDE.md)
+- [JR Developer Guide](docs/Devs/JR_DEV_DEVELOPMENT_GUIDE.md)
 
 ## Learn More
 

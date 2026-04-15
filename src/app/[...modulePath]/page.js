@@ -1,0 +1,47 @@
+import { notFound } from "next/navigation";
+import { loadModules } from "@/modules/loadModules";
+import ModuleAccessGate from "@/core/auth/ModuleAccessGate";
+
+function buildPath(segments) {
+  return `/${segments.join("/")}`;
+}
+
+export default async function ModuleRoutePage({ params }) {
+  const resolvedParams = await params;
+  const currentPath = buildPath(resolvedParams?.modulePath || []);
+  const modules = await loadModules();
+
+  if (!Array.isArray(modules)) {
+    notFound();
+  }
+
+  modules.forEach((mod) => {
+    mod.routes?.sort((a, b) => b.path.length - a.path.length);
+  });
+
+  for (const moduleDefinition of modules) {
+    if (!moduleDefinition?.key || !moduleDefinition?.app_id) {
+      continue;
+    }
+
+    if (!moduleDefinition?.routes) {
+      continue;
+    }
+
+    for (const route of moduleDefinition.routes) {
+      if (!currentPath.startsWith(route.path)) {
+        continue;
+      }
+
+      const Component = route.component;
+
+      return (
+        <ModuleAccessGate appId={moduleDefinition.app_id}>
+          <Component />
+        </ModuleAccessGate>
+      );
+    }
+  }
+
+  notFound();
+}

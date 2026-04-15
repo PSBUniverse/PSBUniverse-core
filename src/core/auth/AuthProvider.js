@@ -1,0 +1,220 @@
+"use client";
+
+import { createContext, useEffect, useMemo, useState } from "react";
+import { getSupabase, initSupabase } from "@/core/supabase/client";
+
+initSupabase(process.env.NEXT_PUBLIC_SUPABASE_URL, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY);
+
+export const AuthContext = createContext(undefined);
+
+function fallbackUserFromAuth(user) {
+  return {
+    email: user?.email || "",
+    username:
+      String(user?.user_metadata?.username || "").trim() ||
+      String(user?.email || "").split("@")[0] ||
+      "",
+    first_name: String(user?.user_metadata?.first_name || "").trim(),
+    last_name: String(user?.user_metadata?.last_name || "").trim(),
+    phone: "",
+    address: "",
+    comp_name: "",
+    comp_email: "",
+    dept_name: "",
+    status_name: "",
+  };
+}
+
+async function fetchBootstrapState() {
+  const response = await fetch("/api/me/bootstrap", {
+    method: "GET",
+    cache: "no-store",
+    credentials: "include",
+  });
+
+  if (!response.ok) {
+    throw new Error("Unable to bootstrap auth state");
+  }
+
+  return response.json();
+}
+
+function setAccessTokenCookie(session) {
+  if (typeof document === "undefined") {
+    return;
+  }
+
+  if (!session?.access_token) {
+    return;
+  }
+
+  const maxAge = Number.isFinite(session?.expires_in) ? session.expires_in : 3600;
+  document.cookie = `sb-access-token=${encodeURIComponent(session.access_token)}; Path=/; Max-Age=${maxAge}; SameSite=Lax`;
+}
+
+function clearAccessTokenCookie() {
+  if (typeof document === "undefined") {
+    return;
+  }
+
+  document.cookie = "sb-access-token=; Path=/; Max-Age=0; SameSite=Lax";
+}
+
+function buildAuthUserFromBootstrap(payloadAuthUser) {
+  if (!payloadAuthUser || typeof payloadAuthUser !== "object") {
+    return null;
+  }
+
+  return {
+    id: payloadAuthUser.id || "",
+    email: payloadAuthUser.email || "",
+    user_metadata:
+      payloadAuthUser.user_metadata && typeof payloadAuthUser.user_metadata === "object"
+        ? payloadAuthUser.user_metadata
+        : {},
+  };
+}
+
+export default function AuthProvider({ children }) {
+  const [authUser, setAuthUser] = useState(null);
+  const [dbUser, setDbUser] = useState(null);
+  const [roles, setRoles] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const supabase = getSupabase();
+    let active = true;
+
+    async function resetAuthState() {
+      if (!active) {
+        return;
+      }
+
+      setAuthUser(null);
+      setDbUser(null);
+      setRoles([]);
+      setLoading(false);
+    }
+
+    async function hydrateAuthState(user, options = {}) {
+      const background = Boolean(options.background);
+
+      if (!active) {
+        return;
+      }
+
+      if (!user) {
+        await resetAuthState();
+        return;
+      }
+
+      if (!background) {
+        setLoading(true);
+      }
+
+      let resolvedAuthUser = user;
+      let resolvedDbUser = fallbackUserFromAuth(user);
+      let resolvedRoles = [];
+
+      try {
+        const payload = await fetchBootstrapState();
+
+        if (payload?.authUser && typeof payload.authUser === "object") {
+          resolvedAuthUser = {
+            ...user,
+            ...payload.authUser,
+            user_metadata: payload.authUser.user_metadata || user.user_metadata || {},
+          };
+        }
+
+        if (payload?.dbUser && typeof payload.dbUser === "object") {
+          resolvedDbUser = payload.dbUser;
+        }
+
+        resolvedRoles = Array.isArray(payload?.roles) ? payload.roles : [];
+      } catch {
+        resolvedAuthUser = user;
+        resolvedDbUser = fallbackUserFromAuth(user);
+        resolvedRoles = [];
+      }
+
+      if (!active) {
+        return;
+      }
+
+      setAuthUser(resolvedAuthUser);
+      setDbUser(resolvedDbUser);
+      setRoles(resolvedRoles);
+      if (!background) {
+        setLoading(false);
+      }
+    }
+
+    async function initializeAuth() {
+      setLoading(true);
+
+      const { data: sessionData } = await supabase.auth.getSession();
+      if (sessionData?.session?.access_token) {
+        setAccessTokenCookie(sessionData.session);
+      }
+
+      const { data, error } = await supabase.auth.getUser();
+
+      if (error || !data?.user) {
+        try {
+          const bootstrapPayload = await fetchBootstrapState();
+          const bootstrapAuthUser = buildAuthUserFromBootstrap(bootstrapPayload?.authUser);
+
+          if (bootstrapAuthUser?.id) {
+            setAuthUser(bootstrapAuthUser);
+            setDbUser(
+              bootstrapPayload?.dbUser && typeof bootstrapPayload.dbUser === "object"
+                ? bootstrapPayload.dbUser
+                : fallbackUserFromAuth(bootstrapAuthUser),
+            );
+            setRoles(Array.isArray(bootstrapPayload?.roles) ? bootstrapPayload.roles : []);
+            setLoading(false);
+            return;
+          }
+        } catch {
+          // Ignore bootstrap fallback failures and reset below.
+        }
+
+        await resetAuthState();
+        return;
+      }
+
+      await hydrateAuthState(data?.user ?? null);
+    }
+
+    initializeAuth();
+
+    const { data } = supabase.auth.onAuthStateChange((event, session) => {
+      if (session?.access_token) {
+        setAccessTokenCookie(session);
+      } else if (event === "SIGNED_OUT") {
+        clearAccessTokenCookie();
+      }
+
+      const background = event === "TOKEN_REFRESHED" || event === "USER_UPDATED";
+      hydrateAuthState(session?.user ?? null, { background });
+    });
+
+    return () => {
+      active = false;
+      data.subscription.unsubscribe();
+    };
+  }, []);
+
+  const value = useMemo(
+    () => ({
+      authUser,
+      dbUser,
+      roles,
+      loading,
+    }),
+    [authUser, dbUser, roles, loading],
+  );
+
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+}

@@ -56,6 +56,7 @@ function isMyAppsPath(pathname) {
 
   const path = normalizePath(pathname);
   return (
+    path === "/" ||
     path === "/dashboard" ||
     path.startsWith("/dashboard/")
   );

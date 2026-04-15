@@ -1,135 +1,177 @@
-# PROJECT OVERVIEW (Beginner Version)
+# Project Overview
 
-## 1) What This System Does
+## Document Purpose
+This document provides a complete technical overview of PSBUniverse Core.
 
-PSBUniverse is the base shell app for business tools.
+Use this as the primary onboarding reference for:
+1. New developers
+2. Architects
+3. Reviewers of auth, RBAC, and module integration changes
 
-Think of it like a mall building:
+## 1) System Summary
 
-- The mall building itself is PSBUniverse (shared login, shared security, shared layout).
-- Each store in the mall is a module app (like Gutter, OHD, Metal Buildings).
-- The shell gives each store the same safe entrance, same hallways, and same rules.
+PSBUniverse Core is a modular SaaS host application.
 
-So this project is not one big business feature. It is the shared foundation that every feature app starts from.
+It is built to separate:
+1. Platform concerns (core)
+2. Domain concerns (modules)
 
-## 2) Real-Life Analogy: A School Campus
+Core responsibilities:
+1. Authentication and identity mapping
+2. Business user and role context
+3. Application entry RBAC
+4. Dynamic module discovery and route resolution
 
-Imagine a school campus:
+Module responsibilities:
+1. Domain features and workflows
+2. Card-level feature filtering
+3. Module-specific UI behavior
 
-- Front desk = login page
-- Hallway map = routing
-- School rules = access control
-- Classroom tools = module features
-- Student records office = database
+## 2) Architectural Model
 
-PSBUniverse is like the campus foundation:
+### Core layer
+Contains reusable platform services that every module depends on.
 
-- It controls who can enter.
-- It knows where people are allowed to go.
-- It provides common services (notifications, loading bars, API patterns).
-- It lets teams build new classrooms (modules) without rebuilding the campus.
+Main platform capabilities:
+1. Auth context lifecycle
+2. User-role mapping
+3. Access helpers
+4. Route gating
+5. Shared shell layout
 
-## 3) Main Parts of the System
+### Module layer
+Contains isolated feature domains loaded by core.
 
-### A) Frontend (What users see)
+Each module provides:
+1. Metadata (key, app_id, name)
+2. Routes list
+3. React components for feature pages
 
-Frontend is the screen UI in the browser.
+### Why this split matters
+1. Consistent security behavior
+2. Faster feature delivery by module teams
+3. Lower long-term maintenance cost
 
-Main location:
+## 3) Authentication System
 
-- `src/app` for route files (pages)
-- `src/modules/user-master/components` for page UI components
-- `src/shared/components` for reusable shared UI
+### Identity source
+Supabase Auth provides auth user identity (UUID).
 
-Simple meaning:
+### Business user source
+psb_s_user provides business profile and domain relationships (INT user_id).
 
-- Buttons, forms, tables, cards, headers, and pages.
+### Runtime mapping
+1. authUser.id is resolved from Supabase session.
+2. dbUser is resolved from psb_s_user by auth_user_id.
+3. dbUser.user_id is used for role and business joins.
 
-### B) Backend (Server logic)
+This separation keeps auth and domain layers clean.
 
-Backend is the logic that runs on the server.
+## 4) RBAC System
 
-Main location:
+RBAC uses a two-layer model.
 
-- `src/app/api/**/route.js` (API endpoints)
-- `src/modules/user-master/services` (real business logic)
+### Layer A: App access (core)
+Data source:
+1. psb_m_userapproleaccess
 
-Simple meaning:
+Check:
+1. hasAppAccess(userRoles, app_id)
 
-- Checks login
-- Checks permission
-- Reads/writes database
-- Returns JSON responses
+Effect:
+1. Dashboard hides unauthorized modules.
+2. Direct route access is blocked for unauthorized users.
 
-### C) Database (Long-term storage)
+### Layer B: Card access (module)
+Data sources:
+1. psb_s_appcard
+2. psb_m_appcardgroup
+3. psb_m_appcardroleaccess
 
-Database is where data lives after the page refreshes.
+Check:
+1. hasCardAccess(card_id, userRoles, cardRoleAccess)
 
-Main connection files:
+Effect:
+1. Module features can be shown/hidden per role mapping.
 
-- `src/infrastructure/supabase/server.js`
-- `src/infrastructure/supabase/admin.js`
-- `src/lib/supabaseClient.js`
+## 5) End-to-End Data Flow
 
-Simple meaning:
+```text
+Login request
+  -> Supabase auth session
+  -> authUser.id
+  -> query psb_s_user by auth_user_id
+  -> dbUser.user_id
+  -> query active role mappings in psb_m_userapproleaccess
+  -> roles in auth context
+  -> core app access checks by app_id
+  -> module route render if authorized
+  -> module card filtering by card-role mapping
+```
 
-- It stores users, roles, cards, and setup data.
+## 6) Layer Responsibilities
 
-## 4) How Everything Connects
+| Layer | Owns | Must Not Own |
+|---|---|---|
+| Core | Auth, user mapping, app-level RBAC, route entry guard | Domain feature behavior |
+| Module | Domain UI, card-level filtering, feature interactions | Global auth identity and app-level authorization policy |
 
-Here is the simple full flow:
+## 7) Key Runtime Files
 
-1. User clicks something on the page.
-2. Frontend component calls a function (often from a hook or service).
-3. That function sends request to an API route.
-4. API route calls server service code.
-5. Service talks to Supabase database.
-6. Database returns data.
-7. Service sends result back through API.
-8. Frontend receives result and updates UI.
+| File | Purpose |
+|---|---|
+| src/app/login/page.js | Supabase login UI and session handoff to dashboard |
+| src/app/api/me/bootstrap/route.js | Server-resolved auth + business user + role payload |
+| src/app/dashboard/page.js | Setup-driven dashboard card resolver with fallback strategies |
+| src/app/profile/page.js | Profile UI backed by core auth context |
+| src/core/auth/AuthProvider.js | Loads and stores authUser, dbUser, roles, loading |
+| src/core/auth/useAuth.js | Accesses auth context safely |
+| src/core/auth/access.js | hasAppAccess and hasCardAccess helpers |
+| src/core/auth/DashboardModules.js | Filters module list by app access |
+| src/core/auth/ModuleAccessGate.js | Blocks unauthorized module routes |
+| src/modules/loadModules.js | Discovers module definitions from root modules folder |
+| src/app/[...modulePath]/page.js | Dynamic route resolution + core access gate |
+| src/middleware.js | Redirects unauthenticated requests to /login |
 
-Short sentence version:
+## 8) Why This Architecture Was Chosen
 
-User click -> Frontend -> Backend API -> Database -> Backend API -> Frontend update.
+1. Prevent duplicated auth and RBAC logic
+2. Keep security enforcement centralized
+3. Enable modular feature delivery at scale
+4. Preserve existing business table model with INT foreign keys
 
-## 5) Actual Example in This Repo
+## 9) What Is Working Today
 
-Example: user opens dashboard.
+1. Global auth context is active.
+2. Login/logout and session guard are active.
+3. App-level RBAC is enforced in dashboard and route entry.
+4. Module loading and route resolution are dynamic.
+5. Card-level helper exists for modules.
 
-1. Browser goes to `/dashboard`.
-2. Route file in `src/app/(protected)/dashboard/page.js` renders dashboard component.
-3. Protected layout `src/app/(protected)/layout.js` wraps page with app shell.
-4. `src/shared/components/layout/AppLayout.js` checks session/access.
-5. Dashboard component can call APIs like `/api/my-apps`.
-6. API route file `src/app/api/my-apps/route.js` forwards to service.
-7. Service file `src/modules/user-master/services/user-master-my-apps.service.js` reads database.
-8. Response comes back and cards are shown on screen.
+## 10) Current Constraints
 
-## 6) Why This Architecture Is Useful
+1. Root modules folder is currently empty.
+2. Card-level filtering behavior is available in core helper but depends on module implementation.
+3. supabase/migrations folder exists but currently has no SQL files.
 
-- Reuse: Teams reuse shell behavior (auth, layout, access).
-- Safety: Access checks happen in one standard pattern.
-- Speed: New modules can be created faster from the same base.
-- Clean code: UI files stay UI-focused, service files stay data-focused.
+## 11) Development Principles
 
-## 7) Shell vs Module (Important)
+1. Keep platform enforcement in core.
+2. Keep business feature logic in modules.
+3. Use DB-driven access logic only.
+4. Avoid hardcoded permission logic.
 
-- Shell repo (this one): shared platform and patterns.
-- Module repo: business-specific logic and pages for one module.
+## 12) Recent Platform Changes (April 2026)
 
-Rule:
+This release introduced a full core-first auth and dashboard stabilization pass.
 
-- Keep shell module-agnostic.
-- Put module business code in module repositories.
+Major outcomes:
+1. Login/session handoff now waits for server bootstrap visibility before dashboard navigation.
+2. Auth initialization now supports bootstrap fallback when client session state is stale.
+3. Dashboard now resolves visible cards from setup source-of-truth tables before module fallback.
+4. Catch-all module route is updated for Next.js 16 params handling (`await params`).
+5. Legacy `user-master` module/session runtime stack is removed from active flow.
 
-## 8) Beginner Summary
+Full details are tracked in `docs/CHANGELOG.md`.
 
-If you remember only this, remember:
-
-- `src/app` = map of routes
-- `src/app/api` = server doors
-- `src/modules/*/services` = brains
-- Supabase = storage room
-- UI pages = what users touch
-
-This is a platform where teams can build safely without stepping on each other.
+This document should be the first read before modifying authentication, RBAC, module registration, or route behavior.

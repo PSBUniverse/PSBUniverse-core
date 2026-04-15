@@ -2,12 +2,10 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
-import { useQueryClient } from "@tanstack/react-query";
 import { Container, Spinner } from "react-bootstrap";
 import Header from "@/shared/components/layout/Header";
-import { useUserMaster } from "@/modules/user-master/hooks/useUserMaster";
-import { useUserAccess } from "@/modules/user-master/hooks/useUserAccess";
-import { clearUserAccessQueries } from "@/modules/user-master/cache/user-master.query";
+import { useAuth } from "@/core/auth/useAuth";
+import { getSupabase } from "@/core/supabase/client";
 import {
   NAVBAR_LOADER_FINISH_EVENT,
   NAVBAR_LOADER_START_EVENT,
@@ -19,9 +17,11 @@ const COMPLETE_FADE_MS = 320;
 const RESET_MS = 220;
 const START_PROGRESS = 0.26;
 const MAX_IN_FLIGHT_PROGRESS = 0.9;
-const APP_ROUTE_ACCESS_RULES = [
-  { prefix: "/setup/admin", appKey: "admin-config" },
-];
+
+function clearAccessTokenCookie() {
+  if (typeof document === "undefined") return;
+  document.cookie = "sb-access-token=; Path=/; Max-Age=0; SameSite=Lax";
+}
 
 function isTrackableApiRequest(input) {
   if (typeof window === "undefined") return false;
@@ -73,55 +73,13 @@ function shouldStartRouteLoader(event) {
   }
 }
 
-function getRequiredAppKeyForPathname(pathname) {
-  const currentPath = String(pathname || "").toLowerCase();
-  const matchingRule = APP_ROUTE_ACCESS_RULES.find((rule) =>
-    currentPath === rule.prefix || currentPath.startsWith(`${rule.prefix}/`)
-  );
-
-  return matchingRule?.appKey || null;
-}
-
 export default function AppLayout({ children }) {
   const pathname = usePathname();
   const router = useRouter();
-  const queryClient = useQueryClient();
+  const { loading, authUser, dbUser } = useAuth();
   const [logoutBusy, setLogoutBusy] = useState(false);
   const [progress, setProgress] = useState(0);
   const [progressVisible, setProgressVisible] = useState(false);
-  const { loading, user, access, isAuthenticated } = useUserMaster();
-  const requiredAppKey = getRequiredAppKeyForPathname(pathname);
-
-  const {
-    access: scopedAccess,
-    accountInactive: scopedAccountInactive,
-    statusRestricted: scopedStatusRestricted,
-    loading: scopedAccessLoading,
-  } = useUserAccess({
-    appKey: requiredAppKey,
-    enabled: Boolean(requiredAppKey && isAuthenticated),
-  });
-
-  const routeAccessLoading = Boolean(requiredAppKey && scopedAccessLoading);
-
-  const routeAccessAllowed = useMemo(() => {
-    if (!requiredAppKey) {
-      return true;
-    }
-
-    if (scopedAccountInactive || scopedStatusRestricted) {
-      return false;
-    }
-
-    return Boolean(
-      scopedAccess?.isDevMain ||
-        scopedAccess?.hasAppAccess ||
-        scopedAccess?.hasAccess ||
-        scopedAccess?.permissions?.read
-    );
-  }, [requiredAppKey, scopedAccess, scopedAccountInactive, scopedStatusRestricted]);
-
-  const routeSignature = useMemo(() => pathname, [pathname]);
 
   const activeLoadCountRef = useRef(0);
   const hasMountedRouteRef = useRef(false);
@@ -130,6 +88,17 @@ export default function AppLayout({ children }) {
   const showDelayTimerRef = useRef(null);
   const completionTimerRef = useRef(null);
   const resetTimerRef = useRef(null);
+
+  const isLoginPage = pathname === "/login";
+  const isAuthenticated = Boolean(authUser);
+
+  const user = useMemo(() => {
+    return {
+      first_name: dbUser?.first_name,
+      username: dbUser?.username,
+      email: dbUser?.email || authUser?.email,
+    };
+  }, [authUser?.email, dbUser?.email, dbUser?.first_name, dbUser?.username]);
 
   const clearProgressTimers = useCallback(() => {
     if (progressIntervalRef.current) {
@@ -180,7 +149,7 @@ export default function AppLayout({ children }) {
       progressIntervalRef.current = window.setInterval(() => {
         const nextProgress = Math.min(
           MAX_IN_FLIGHT_PROGRESS,
-          progressRef.current + (1 - progressRef.current) * 0.05
+          progressRef.current + (1 - progressRef.current) * 0.05,
         );
 
         progressRef.current = nextProgress;
@@ -250,30 +219,18 @@ export default function AppLayout({ children }) {
   }, [completeProgress]);
 
   useEffect(() => {
-    if (!loading && !isAuthenticated) {
+    if (!loading && !isAuthenticated && !isLoginPage) {
       startLoader();
       router.replace("/login");
     }
-  }, [isAuthenticated, loading, router, startLoader]);
+  }, [isAuthenticated, isLoginPage, loading, router, startLoader]);
 
   useEffect(() => {
-    if (loading || !isAuthenticated || !requiredAppKey || routeAccessLoading) {
-      return;
-    }
-
-    if (!routeAccessAllowed) {
+    if (!loading && isAuthenticated && isLoginPage) {
       startLoader();
       router.replace("/dashboard");
     }
-  }, [
-    isAuthenticated,
-    loading,
-    requiredAppKey,
-    routeAccessAllowed,
-    routeAccessLoading,
-    router,
-    startLoader,
-  ]);
+  }, [isAuthenticated, isLoginPage, loading, router, startLoader]);
 
   useEffect(() => {
     if (!hasMountedRouteRef.current) {
@@ -282,7 +239,7 @@ export default function AppLayout({ children }) {
     }
 
     finishLoader();
-  }, [finishLoader, routeSignature]);
+  }, [finishLoader, pathname]);
 
   useEffect(() => {
     if (typeof window === "undefined") return undefined;
@@ -353,16 +310,18 @@ export default function AppLayout({ children }) {
   async function handleLogout() {
     setLogoutBusy(true);
     try {
-      await fetch("/api/auth/logout", { method: "POST" });
+      const supabase = getSupabase();
+      await supabase.auth.signOut();
     } finally {
-      clearUserAccessQueries(queryClient);
+      clearAccessTokenCookie();
       setLogoutBusy(false);
       startLoader();
       router.replace("/login");
+      router.refresh();
     }
   }
 
-  if (loading || (requiredAppKey && (routeAccessLoading || !routeAccessAllowed))) {
+  if (loading && !isLoginPage) {
     return (
       <main className="auth-loading">
         <Spinner animation="border" role="status" />
@@ -370,8 +329,12 @@ export default function AppLayout({ children }) {
     );
   }
 
-  if (!isAuthenticated) {
+  if (!isAuthenticated && !isLoginPage) {
     return null;
+  }
+
+  if (isLoginPage) {
+    return children;
   }
 
   return (
