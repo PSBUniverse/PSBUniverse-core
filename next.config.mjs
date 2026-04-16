@@ -9,6 +9,11 @@ const nextConfig = {
   turbopack: {
     root: __dirname,
   },
+  onDemandEntries: {
+    // Keep dev pages hot longer to avoid tab-switch recompiles that feel like reloads.
+    maxInactiveAge: 60 * 60 * 1000,
+    pagesBufferLength: 8,
+  },
 };
 
 export default nextConfig;

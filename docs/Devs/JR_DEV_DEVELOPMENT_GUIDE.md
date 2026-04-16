@@ -1,5 +1,9 @@
 # JR Developer Development Guide
 
+Canonical standard:
+- Follow [PSBUniverse Development Rules (Final)](./PSBUNIVERSE_DEVELOPMENT_RULES_FINAL.md) for all non-negotiable architecture, UI, Table, and module constraints.
+- Follow [Shared UI System Lockdown](./SHARED_UI_SYSTEM_LOCKDOWN.md) for strict shared component usage, behavior contracts, and design consistency rules.
+
 Strict rules for junior developers working on PSBUniverse Core.
 
 This is not a tutorial.
@@ -307,7 +311,158 @@ Goal:
 
 ---
 
-## 12) Common Mistakes
+## 12) Shared Table Rules (Required for New Module Tables)
+
+Use shared table from core UI for all new module tables.
+
+Import:
+
+```js
+import { Table } from "@/shared/components/ui";
+```
+
+Hard rules:
+1. Do not install table libraries inside a module folder
+2. Do not build one-off table behavior per page when shared table already supports it
+3. Keep data and filter values in module state and pass into shared table via props
+4. Table is controlled mode only. Do not pass children rows manually.
+
+What shared table already supports:
+1. Header sorting
+2. Global search
+3. Data-driven filters and databound select options provided by module state
+4. Column resize with minimum width enforcement
+5. Dynamic column visibility toggles
+6. Row actions
+7. Controlled pagination
+8. Loading and empty states
+9. Export hooks (CSV or Excel)
+
+Data Table API example:
+
+```js
+const [columns, setColumns] = useState([
+   {
+      key: "name",
+      label: "Name",
+      sortable: true,
+      resizable: true,
+      width: 220,
+      visible: true,
+   },
+   {
+      key: "status",
+      label: "Status",
+      visible: true,
+      render: (row) => <Badge>{row.status}</Badge>,
+   },
+   {
+      key: "internal_notes",
+      label: "Notes",
+      visible: false,
+   },
+]);
+
+const [sort, setSort] = useState({ key: "name", direction: "asc" });
+const [applicationOptions, setApplicationOptions] = useState([]);
+
+useEffect(() => {
+   let active = true;
+
+   async function loadApplicationOptions() {
+      const apps = await fetchApplications();
+      if (!active) return;
+
+      setApplicationOptions(
+         apps.map((item) => ({
+            label: item.name,
+            value: item.id,
+         }))
+      );
+   }
+
+   loadApplicationOptions();
+
+   return () => {
+      active = false;
+   };
+}, []);
+
+const filtersConfig = [
+   {
+      key: "status",
+      label: "Status",
+      type: "select",
+      options: [
+         { label: "Active", value: true },
+         { label: "Inactive", value: false },
+      ],
+   },
+   {
+      key: "app_id",
+      label: "Application",
+      type: "select",
+      dataSource: fetchApplications,
+      options: applicationOptions,
+   },
+   {
+      key: "created_at",
+      label: "Created Date",
+      type: "date-range",
+   },
+];
+
+const actions = [
+   { label: "Edit", onClick: (row) => handleEdit(row) },
+   { label: "Delete", onClick: (row) => handleDelete(row), variant: "danger" },
+];
+
+const handleColumnVisibilityChange = (nextColumns) => {
+   setColumns(nextColumns);
+};
+
+const handleColumnResizeChange = (nextColumns) => {
+   setColumns(nextColumns);
+};
+
+<Table
+   columns={columns}
+   data={rows}
+   loading={loading}
+   total={total}
+   page={page}
+   pageSize={pageSize}
+   filters={filtersConfig}
+   appliedFilters={appliedFilters}
+   sort={sort}
+   onFilterChange={handleFilterChange}
+   onSortChange={setSort}
+   onPageChange={handlePageChange}
+   onSearchChange={handleSearch}
+   onColumnVisibilityChange={handleColumnVisibilityChange}
+   onColumnResizeChange={handleColumnResizeChange}
+   actions={actions}
+   onExport={handleExport}
+/>
+```
+
+Rules to remember:
+1. Never hardcode filters inside table component files in modules
+2. Databound filter options are fetched in module code and passed into `options`
+3. Never place RBAC checks in Table visibility logic
+4. RBAC decides whether a column exists in columns array
+5. UI visibility decides if existing column is shown by user toggle
+6. Keep all data/query state in module page and pass into Table
+7. Always pass controlled handlers for sort, visibility, and resize
+
+Blessed companion example:
+1. Open `/examples/data-table` in dev
+2. Copy from `src/app/examples/data-table/page.js`
+3. Follow API pattern from `src/app/api/examples/data-table/`
+
+---
+
+## 13) Common Mistakes
 
 Top mistakes to avoid:
 1. Hardcoding roles in components
@@ -322,7 +477,7 @@ Why these matter:
 
 ---
 
-## 13) Final Checklist Before Submitting
+## 14) Final Checklist Before Submitting
 
 All items must pass before PR:
 

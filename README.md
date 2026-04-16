@@ -52,6 +52,8 @@ Beginner-proof documentation is available in the `docs/` folder.
 - [Database Naming Conventions](docs/DATABASE_NAMING_CONVENTIONS.md)
 - [Styling Guide](docs/STYLING_GUIDE.md)
 - [JR Developer Guide](docs/Devs/JR_DEV_DEVELOPMENT_GUIDE.md)
+- [PSBUniverse Development Rules (Final)](docs/Devs/PSBUNIVERSE_DEVELOPMENT_RULES_FINAL.md)
+- [Shared UI System Lockdown](docs/Devs/SHARED_UI_SYSTEM_LOCKDOWN.md)
 
 ## Learn More
 

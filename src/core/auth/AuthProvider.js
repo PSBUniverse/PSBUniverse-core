@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useEffect, useMemo, useState } from "react";
+import { createContext, useEffect, useMemo, useRef, useState } from "react";
 import { getSupabase, initSupabase } from "@/core/supabase/client";
 
 initSupabase(process.env.NEXT_PUBLIC_SUPABASE_URL, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY);
@@ -80,6 +80,7 @@ export default function AuthProvider({ children }) {
   const [dbUser, setDbUser] = useState(null);
   const [roles, setRoles] = useState([]);
   const [loading, setLoading] = useState(true);
+  const hasInitializedRef = useRef(false);
 
   useEffect(() => {
     const supabase = getSupabase();
@@ -98,6 +99,7 @@ export default function AuthProvider({ children }) {
 
     async function hydrateAuthState(user, options = {}) {
       const background = Boolean(options.background);
+      const syncBootstrap = options.syncBootstrap !== false;
 
       if (!active) {
         return;
@@ -110,6 +112,26 @@ export default function AuthProvider({ children }) {
 
       if (!background) {
         setLoading(true);
+      }
+
+      if (!syncBootstrap) {
+        setAuthUser((currentAuthUser) => {
+          if (!currentAuthUser) {
+            return user;
+          }
+
+          return {
+            ...currentAuthUser,
+            ...user,
+            user_metadata: user.user_metadata || currentAuthUser.user_metadata || {},
+          };
+        });
+
+        if (!background) {
+          setLoading(false);
+        }
+
+        return;
       }
 
       let resolvedAuthUser = user;
@@ -153,38 +175,42 @@ export default function AuthProvider({ children }) {
     async function initializeAuth() {
       setLoading(true);
 
-      const { data: sessionData } = await supabase.auth.getSession();
-      if (sessionData?.session?.access_token) {
-        setAccessTokenCookie(sessionData.session);
-      }
-
-      const { data, error } = await supabase.auth.getUser();
-
-      if (error || !data?.user) {
-        try {
-          const bootstrapPayload = await fetchBootstrapState();
-          const bootstrapAuthUser = buildAuthUserFromBootstrap(bootstrapPayload?.authUser);
-
-          if (bootstrapAuthUser?.id) {
-            setAuthUser(bootstrapAuthUser);
-            setDbUser(
-              bootstrapPayload?.dbUser && typeof bootstrapPayload.dbUser === "object"
-                ? bootstrapPayload.dbUser
-                : fallbackUserFromAuth(bootstrapAuthUser),
-            );
-            setRoles(Array.isArray(bootstrapPayload?.roles) ? bootstrapPayload.roles : []);
-            setLoading(false);
-            return;
-          }
-        } catch {
-          // Ignore bootstrap fallback failures and reset below.
+      try {
+        const { data: sessionData } = await supabase.auth.getSession();
+        if (sessionData?.session?.access_token) {
+          setAccessTokenCookie(sessionData.session);
         }
 
-        await resetAuthState();
-        return;
-      }
+        const { data, error } = await supabase.auth.getUser();
 
-      await hydrateAuthState(data?.user ?? null);
+        if (error || !data?.user) {
+          try {
+            const bootstrapPayload = await fetchBootstrapState();
+            const bootstrapAuthUser = buildAuthUserFromBootstrap(bootstrapPayload?.authUser);
+
+            if (bootstrapAuthUser?.id) {
+              setAuthUser(bootstrapAuthUser);
+              setDbUser(
+                bootstrapPayload?.dbUser && typeof bootstrapPayload.dbUser === "object"
+                  ? bootstrapPayload.dbUser
+                  : fallbackUserFromAuth(bootstrapAuthUser),
+              );
+              setRoles(Array.isArray(bootstrapPayload?.roles) ? bootstrapPayload.roles : []);
+              setLoading(false);
+              return;
+            }
+          } catch {
+            // Ignore bootstrap fallback failures and reset below.
+          }
+
+          await resetAuthState();
+          return;
+        }
+
+        await hydrateAuthState(data?.user ?? null);
+      } finally {
+        hasInitializedRef.current = true;
+      }
     }
 
     initializeAuth();
@@ -196,8 +222,20 @@ export default function AuthProvider({ children }) {
         clearAccessTokenCookie();
       }
 
-      const background = event === "TOKEN_REFRESHED" || event === "USER_UPDATED";
-      hydrateAuthState(session?.user ?? null, { background });
+      if (!hasInitializedRef.current && event === "INITIAL_SESSION") {
+        return;
+      }
+
+      const sessionUser = session?.user ?? null;
+
+      if (!sessionUser && event !== "SIGNED_OUT") {
+        return;
+      }
+
+      hydrateAuthState(sessionUser, {
+        background: true,
+        syncBootstrap: event !== "TOKEN_REFRESHED",
+      });
     });
 
     return () => {

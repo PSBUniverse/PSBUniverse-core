@@ -1,9 +1,17 @@
-export { default as Button } from "@/shared/components/ui/Button";
-export { default as Card } from "@/shared/components/ui/Card";
-export { default as Modal } from "@/shared/components/ui/Modal";
-export { default as Table } from "@/shared/components/ui/Table";
-export { default as Badge } from "@/shared/components/ui/Badge";
-export { default as Input } from "@/shared/components/ui/Input";
+export { default as Button } from "@/shared/components/ui/controls/Button";
+export { default as Dropdown } from "@/shared/components/ui/controls/Dropdown";
+export { default as Card } from "@/shared/components/ui/surface/Card";
+export { default as Modal } from "@/shared/components/ui/overlay/Modal";
+export { default as Table } from "@/shared/components/ui/table/Table";
+export { default as ActionColumn } from "@/shared/components/ui/table/ActionColumn";
+export { default as Badge } from "@/shared/components/ui/feedback/Badge";
+export { default as Input } from "@/shared/components/ui/controls/Input";
+export { default as SearchBar } from "@/shared/components/ui/controls/SearchBar";
+export { default as GlobalToastHost } from "@/shared/components/ui/feedback/GlobalToastHost";
+export {
+  TABLE_FILTER_TYPES,
+  createFilterConfig,
+} from "@/shared/components/ui/table/filterSchema";
 export {
   showToast,
   toastSuccess,
@@ -12,4 +20,4 @@ export {
   toastInfo,
   TOAST_EVENT,
   TOAST_TYPES,
-} from "@/shared/components/ui/Toast";
+} from "@/shared/components/ui/feedback/Toast";

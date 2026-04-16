@@ -2,7 +2,7 @@ import "./globals.css";
 import { Inter, Manrope } from "next/font/google";
 import AppLayout from "@/shared/components/layout/AppLayout";
 import AuthProvider from "@/core/auth/AuthProvider";
-import GlobalToastHost from "@/shared/components/ui/GlobalToastHost";
+import { GlobalToastHost } from "@/shared/components/ui";
 
 const inter = Inter({
   subsets: ["latin"],

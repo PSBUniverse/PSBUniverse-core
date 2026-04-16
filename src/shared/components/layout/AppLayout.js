@@ -39,7 +39,13 @@ function isTrackableApiRequest(input) {
 
   try {
     const parsed = new URL(requestUrl, window.location.origin);
-    return parsed.origin === window.location.origin && parsed.pathname.startsWith("/api/");
+    if (parsed.origin !== window.location.origin) return false;
+    if (!parsed.pathname.startsWith("/api/")) return false;
+
+    // Keep background auth hydration silent so focus/session events do not look like page reloads.
+    if (parsed.pathname === "/api/me/bootstrap") return false;
+
+    return true;
   } catch {
     return false;
   }

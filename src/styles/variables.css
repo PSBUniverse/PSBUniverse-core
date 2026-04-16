@@ -13,4 +13,26 @@
   --psb-serif: var(--psb-font-secondary);
   --psb-sans: var(--psb-font-primary);
   --psb-shadow: 0 12px 32px rgba(18, 54, 83, 0.12);
+
+  /* Locked design tokens */
+  --psb-space-4: 4px;
+  --psb-space-8: 8px;
+  --psb-space-12: 12px;
+  --psb-space-16: 16px;
+  --psb-space-24: 24px;
+
+  --psb-radius-6: 6px;
+  --psb-radius-8: 8px;
+  --psb-radius-12: 12px;
+
+  --psb-font-12: 12px;
+  --psb-font-14: 14px;
+  --psb-font-16: 16px;
+
+  --psb-transition-150: 0.15s;
+  --psb-transition-200: 0.2s;
+
+  --psb-icon-16: 16px;
+  --psb-icon-20: 20px;
+  --psb-control-height: 32px;
 }

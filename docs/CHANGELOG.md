@@ -115,7 +115,7 @@ Added:
 2. `src/shared/components/ui/Card.js`
 3. `src/shared/components/ui/Input.js`
 4. `src/shared/components/ui/Modal.js`
-5. `src/shared/components/ui/Table.js`
+5. `src/shared/components/ui/table/Table.js`
 6. `src/shared/components/ui/Badge.js`
 7. `src/shared/components/ui/index.js`
 8. `src/shared/components/layout/PageContainer.js`

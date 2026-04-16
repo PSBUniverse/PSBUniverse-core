@@ -18,7 +18,10 @@ Use this index to find the current architecture and implementation guides.
 ## Frontend
 
 - [Styling Guide](STYLING_GUIDE.md)
+- Data Table Companion Example (route: `/examples/data-table`, files in `src/app/examples/data-table` and `src/app/api/examples/data-table`)
+- [Shared UI System Lockdown](Devs/SHARED_UI_SYSTEM_LOCKDOWN.md)
 
 ## Team Onboarding
 
 - [JR Developer Development Guide](Devs/JR_DEV_DEVELOPMENT_GUIDE.md)
+- [PSBUniverse Development Rules (Final)](Devs/PSBUNIVERSE_DEVELOPMENT_RULES_FINAL.md)
