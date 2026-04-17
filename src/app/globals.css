@@ -610,6 +610,18 @@
   gap: 0.35rem;
 }
 
+.psb-ui-table-page-size-select {
+  background-image: none !important;
+  padding-right: 0.5rem !important;
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+}
+
+.psb-ui-table-page-size-select::-ms-expand {
+  display: none;
+}
+
 .psb-ui-table-page-list {
   display: inline-flex;
   align-items: center;
