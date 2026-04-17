@@ -6,8 +6,17 @@ function Dropdown(props) {
   return <BootstrapDropdown {...props} />;
 }
 
+function DropdownMenu(props) {
+  return (
+    <BootstrapDropdown.Menu
+      {...props}
+      style={{ zIndex: 9999, ...props.style }}
+    />
+  );
+}
+
 Dropdown.Toggle = BootstrapDropdown.Toggle;
-Dropdown.Menu = BootstrapDropdown.Menu;
+Dropdown.Menu = DropdownMenu;
 Dropdown.Item = BootstrapDropdown.Item;
 Dropdown.Divider = BootstrapDropdown.Divider;
 

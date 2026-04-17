@@ -83,6 +83,14 @@ Ordering:
 2. Secondary
 3. Danger
 
+Row action type contract (strict):
+- Supported row action `type` values are only:
+	- `primary`
+	- `secondary`
+	- `danger`
+- Do not pass `success` or `warning` directly to ActionColumn/Table row actions.
+- If business semantics are success/warning, map semantics to a supported UI type before emitting row actions.
+
 ---
 
 ## Filter System
@@ -252,21 +260,22 @@ Standard actions:
 - Void
 - Confirm
 
-Visual mapping:
+Semantic mapping (workflow intent):
 
-| Action | Type |
+| Action | Semantic Type | Preferred UI Variant |
 | --- | --- |
-| Approve | Success |
-| Confirm | Primary |
-| Reject | Danger |
-| Void | Danger |
-| Return | Warning |
-| Recall | Secondary |
+| Approve | Success | Primary |
+| Confirm | Primary | Primary |
+| Reject | Danger | Danger |
+| Void | Danger | Danger |
+| Return | Warning | Secondary |
+| Recall | Secondary | Secondary |
 
 Rules:
 - Critical actions must require confirmation
 - Actions must show loading while executing
 - These actions are implemented in toolbar flows; ActionColumn rules apply only to row actions
+- Toolbar workflow actions may use semantic labels like success/warning, but Table row actions must still comply with the ActionColumn row action type contract
 - All actions must be state-driven
 - Disable actions when not allowed
 - Do not show invalid actions

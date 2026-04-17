@@ -18,6 +18,7 @@ Use this index to find the current architecture and implementation guides.
 ## Frontend
 
 - [Styling Guide](STYLING_GUIDE.md)
+- Shared UI Reference + Playground (route: `/examples`, files in `src/app/examples/page.js` and `src/app/examples/page.module.css`)
 - Data Table Companion Example (route: `/examples/data-table`, files in `src/app/examples/data-table` and `src/app/api/examples/data-table`)
 - [Shared UI System Lockdown](Devs/SHARED_UI_SYSTEM_LOCKDOWN.md)
 

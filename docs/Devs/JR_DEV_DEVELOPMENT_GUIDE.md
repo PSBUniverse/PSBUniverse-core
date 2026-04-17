@@ -460,6 +460,25 @@ Blessed companion example:
 2. Copy from `src/app/examples/data-table/page.js`
 3. Follow API pattern from `src/app/api/examples/data-table/`
 
+Primary shared UI reference:
+1. Open `/examples` in dev for the full shared UI guide/playground/reference experience
+2. Use Quick Start for baseline setup sequence
+3. Use Playground for interaction testing
+4. Use Reference for props/pattern contracts
+
+Row action type rule (strict):
+1. Table row action `type` supports only:
+   - `primary`
+   - `secondary`
+   - `danger`
+2. Do not pass `success` or `warning` to row actions in shared Table config
+3. If business meaning is success/warning, map to a supported UI type before passing actions
+
+Bonus playground usage:
+1. Use Bonus Playground table scenario as the default pattern for real-world review/approval flows
+2. Use Bonus Add User form as the baseline for shared Input + Dropdown + validation composition
+3. Use modal confirmation pattern for critical workflow actions instead of browser prompt UX
+
 ---
 
 ## 13) Common Mistakes

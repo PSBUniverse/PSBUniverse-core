@@ -1,5 +1,70 @@
 # Changelog
 
+## 2026-04-17 Shared UI Examples And Playground Update
+
+This release updates the shared UI examples route and documentation flow to improve developer onboarding and sandbox testing.
+
+### 1) Examples Route Restructure
+
+Updated:
+1. `src/app/examples/page.js`
+2. `src/app/examples/page.module.css`
+
+Behavior changes:
+1. `/examples` now uses a three-layer structure:
+   - Quick Start
+   - Playground
+   - Reference
+2. Reference content is split by component with clearer pattern guidance.
+3. State-driven controls now include pattern toggles:
+   - Input (Basic, Validation)
+   - SearchBar (Basic, With API)
+   - Modal (Basic, Save Flow)
+
+### 2) Playground Expansion (Bonus Section)
+
+Added:
+1. Bonus Playground section in `/examples` with accordion-based scenarios:
+   - Workflow actions with modal confirmation pattern
+   - Real-world table scenario (employee review)
+   - Add User form with shared components only
+
+Behavior changes:
+1. Workflow confirmation example now demonstrates shared `Modal` flow instead of browser prompt patterns.
+2. Real-world table scenario uses supported row action types and confirm flow.
+3. Add User form includes explicit hardcoded demo options for dropdown-based fields.
+
+### 3) Dropdown Layering And Visibility Fixes
+
+Updated:
+1. `src/shared/components/ui/controls/Dropdown.js`
+2. `src/app/examples/page.module.css`
+3. `src/app/examples/page.js`
+
+Behavior changes:
+1. Shared dropdown menu layering is raised (`z-index`) for overlay safety.
+2. Accordion clipping issue resolved (overflow clipping removed from accordion item container).
+3. Add User demo dropdowns open upward to keep options visible near bottom-of-page accordions.
+
+### 4) Table Pagination UI Cleanup
+
+Updated:
+1. `src/shared/components/ui/table/Table.js`
+2. `src/app/globals.css`
+
+Behavior changes:
+1. Rows-per-page selector now uses default iconless style (`psb-ui-table-page-size-select`).
+
+### 5) Docs Alignment
+
+Updated:
+1. `docs/README.md`
+2. `docs/Devs/JR_DEV_DEVELOPMENT_GUIDE.md`
+
+Behavior changes:
+1. Docs now reference `/examples` as the primary shared UI reference/playground route.
+2. Junior-dev guidance now reflects updated examples usage and supported table row-action type constraints.
+
 ## 2026-04-16 Core Refactor And Stability Update
 
 This release consolidates authentication, routing, dashboard access resolution, and profile rendering into a core-first architecture.

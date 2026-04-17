@@ -900,6 +900,7 @@ export default function Table({
             </Form.Label>
             <Form.Select
               id={`${tableId}-page-size`}
+              className="psb-ui-table-page-size-select"
               size="sm"
               value={String(normalizedPagination.pageSize)}
               onChange={handlePageSizeChange}
