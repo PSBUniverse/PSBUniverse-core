@@ -399,18 +399,18 @@ const SNIPPET_TOKENS = `/* Design tokens \u2014 from src/styles/variables.css */
 /* Transitions */
 --psb-transition-150  --psb-transition-200`;
 
-const SNIPPET_MODULE_STRUCTURE = `src/modules/<module-name>/
+const SNIPPET_MODULE_STRUCTURE = `modules/<module-name>/
   src/
     index.js
     pages/
     components/
+    hooks/
     services/
     repo/
       <module>.repo.js
     model/
       <module>.model.js
-    hooks/ -- optional
-    utils/ -- optional`;
+    utils/`;
 
 const SNIPPET_MODULE_MANIFEST = `import DashboardPage from "./pages/DashboardPage";
 
@@ -424,7 +424,7 @@ export default {
   ],
 };`;
 
-const SNIPPET_MODULE_BUILD_SEQUENCE = `1. Copy module template
+const SNIPPET_MODULE_BUILD_SEQUENCE = `1. Create folder: modules/<module-name>/src/
 2. Register app in psb_s_application
 3. Create groups in psb_m_appcardgroup
 4. Create cards in psb_s_appcard
@@ -433,25 +433,39 @@ const SNIPPET_MODULE_BUILD_SEQUENCE = `1. Copy module template
 7. Apply card access checks
 8. Test authorized and unauthorized flows`;
 
-const SNIPPET_CRUD_REPOSITORY_PATTERN = `// services/userService.js
-export async function createUser(payload) {
-  return userRepository.create(payload);
+const SNIPPET_CRUD_REPOSITORY_PATTERN = `// hooks/useUsersData.js
+import { usersService } from "../services/users.service";
+
+export async function useUsersData() {
+  return usersService.createUser(payload);
 }
 
-// repositories/userRepository.js
-export async function create(payload) {
-  const { data, error } = await supabase
+// services/users.service.js
+import { getSupabase } from "../utils/supabase";
+import { userRepository } from "../repo/user.repo";
+
+export const usersService = {
+  async createUser(payload) {
+    const supabase = await getSupabase();
+    return userRepository.create(supabase, payload);
+  },
+};
+
+// repo/user.repo.js
+export const userRepository = {
+  async create(supabase, payload) {
+    const { data, error } = await supabase
     .from("psb_s_user")
     .insert(payload)
     .select("*")
     .single();
 
-  if (error) throw new Error(error.message);
-  return data;
-}
+    if (error) throw new Error(error.message);
+    return data;
+  },
+};
 
-// UI layer rule:
-// NEVER call Supabase directly from components.`;
+// Rule: UI -> Hooks -> Services -> Repository -> Database`;
 
 const SNIPPET_MODEL_MAPPER = `// model/appRole.model.js
 
@@ -464,63 +478,74 @@ export function mapAppRole(row) {
   };
 }`;
 
-const SNIPPET_REPO_SUPABASE = `// repo/appRole.repo.js
+const SNIPPET_REPO_SUPABASE = `// utils/supabase.js
+//
+// ⚠️ Every module MUST use this helper instead of calling getSupabase() directly.
+// Modules are loaded at runtime via a dynamic filesystem loader.
+// The core Supabase singleton may not be initialized yet at that point.
+//
+export async function getSupabase() {
+  const mod = await import("../../../../src/core/supabase/client.js");
 
-import { supabase } from "@/core/supabaseClient";
+  try {
+    // Case 1: core already initialized the singleton
+    return mod.getSupabase();
+  } catch {
+    const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
+    if (url && anonKey) {
+      // Case 2: initialize it ourselves with public env keys
+      return mod.initSupabase(url, anonKey);
+    }
+
+    // Case 3: server-side — fall back to admin client
+    const { getSupabaseAdmin } = await import("../../../../src/core/supabase/admin.js");
+    return getSupabaseAdmin();
+  }
+}
+
+// repo/appRole.repo.js
+// ✅ Repo receives supabase as a parameter — it never imports it directly.
 import { mapAppRole } from "../model/appRole.model";
 
 export const appRoleRepo = {
-
-  async getAll() {
+  async getAll(supabase) {
     const { data, error } = await supabase
       .from("psb_s_app_roles")
       .select("*");
 
     if (error) throw new Error(error.message);
-
     return data.map(mapAppRole);
   },
-
-  async insert(payload) {
-    const { data, error } = await supabase
-      .from("psb_s_app_roles")
-      .insert({
-        role_name: payload.roleName,
-        description: payload.description
-      })
-      .select("*")
-      .single();
-
-    if (error) throw new Error(error.message);
-
-    return mapAppRole(data);
-  }
 };`;
 
-const SNIPPET_SERVICE_LAYER = `// service/useAppRole.js
-
+const SNIPPET_SERVICE_LAYER = `// services/appRole.service.js
+import { getSupabase } from "../utils/supabase";
 import { appRoleRepo } from "../repo/appRole.repo";
 
-export async function useCreateAppRole(data) {
-  return await appRoleRepo.insert(data);
-}`;
+export const appRoleService = {
+  async create(data) {
+    const supabase = await getSupabase();
+    return appRoleRepo.insert(supabase, data);
+  },
+};`;
 
-const SNIPPET_ROLES_STRUCTURE = `?? STRUCTURE
-src/modules/roles/
+const SNIPPET_ROLES_STRUCTURE = `modules/roles/
   src/
     index.js
     pages/
       RolesPage.jsx
     components/
       RolesTable.jsx
+    hooks/
+      useRolesTable.js
     services/
-      useRoles.js
+      roles.service.js
     repo/
       roles.repo.js
     model/
       roles.model.js
-    hooks/
-      useRolesTable.js
     utils/`;
 
 const SNIPPET_ROLES_MODEL = `// model/roles.model.js
@@ -537,14 +562,13 @@ export function mapRole(row) {
 
 const SNIPPET_ROLES_REPO = `// repo/roles.repo.js
 
-import { supabase } from "@/core/supabaseClient";
 import { mapRole } from "../model/roles.model";
 
 const TABLE = "psb_s_role";
 
 export const rolesRepo = {
 
-  async getAll() {
+  async getAll(supabase) {
     const { data, error } = await supabase
       .from(TABLE)
       .select("*")
@@ -555,7 +579,7 @@ export const rolesRepo = {
     return data.map(mapRole);
   },
 
-  async insert(payload) {
+  async insert(supabase, payload) {
     const { data, error } = await supabase
       .from(TABLE)
       .insert({
@@ -571,7 +595,7 @@ export const rolesRepo = {
     return mapRole(data);
   },
 
-  async update(payload) {
+  async update(supabase, payload) {
     const { data, error } = await supabase
       .from(TABLE)
       .update({
@@ -589,52 +613,66 @@ export const rolesRepo = {
     return mapRole(data);
   },
 
-  async delete(id) {
-    const { error } = await supabase
+  async delete(supabase, id) {
+    // First, remove all user-role access mappings for this role
+    const { error: accessError } = await supabase
+      .from("psb_m_userapproleaccess")
+      .delete()
+      .eq("role_id", id);
+
+    if (accessError) throw new Error(accessError.message);
+
+    // Then delete the role itself
+    const { error: roleError } = await supabase
       .from(TABLE)
       .delete()
       .eq("role_id", id);
 
-    if (error) throw new Error(error.message);
+    if (roleError) throw new Error(roleError.message);
 
     return true;
   }
 };`;
 
-const SNIPPET_ROLES_SERVICE = `// services/useRoles.js
+const SNIPPET_ROLES_SERVICE = `// services/roles.service.js
 
+import { getSupabase } from "../utils/supabase";
 import { rolesRepo } from "../repo/roles.repo";
 
-export const useRolesService = {
+export const rolesService = {
 
   async getRoles() {
-    return await rolesRepo.getAll();
+    const supabase = await getSupabase();
+    return rolesRepo.getAll(supabase);
   },
 
   async createRole(data) {
     if (!data.name) throw new Error("Role name is required");
-    return await rolesRepo.insert(data);
+    const supabase = await getSupabase();
+    return rolesRepo.insert(supabase, data);
   },
 
   async updateRole(data) {
-    return await rolesRepo.update(data);
+    const supabase = await getSupabase();
+    return rolesRepo.update(supabase, data);
   },
 
   async deleteRole(id) {
-    return await rolesRepo.delete(id);
+    const supabase = await getSupabase();
+    return rolesRepo.delete(supabase, id);
   }
 };`;
 
 const SNIPPET_ROLES_HOOK = `// hooks/useRolesTable.js
 
 import { useEffect, useState } from "react";
-import { useRolesService } from "../services/useRoles";
+import { rolesService } from "../services/roles.service";
 
 export function useRolesTable() {
   const [data, setData] = useState([]);
 
   async function load() {
-    const res = await useRolesService.getRoles();
+    const res = await rolesService.getRoles();
     setData(res);
   }
 
@@ -679,13 +717,13 @@ const SNIPPET_ROLES_PAGE = `// pages/RolesPage.jsx
 
 import RolesTable from "../components/RolesTable";
 import { useRolesTable } from "../hooks/useRolesTable";
-import { useRolesService } from "../services/useRoles";
+import { rolesService } from "../services/roles.service";
 
 export default function RolesPage() {
   const { data, reload } = useRolesTable();
 
   async function handleDelete(id) {
-    await useRolesService.deleteRole(id);
+    await rolesService.deleteRole(id);
     reload();
   }
 
@@ -702,8 +740,12 @@ const SNIPPET_ROLES_INDEX = `// index.js
 import RolesPage from "./pages/RolesPage";
 
 export default {
-  route: "/roles",
-  component: RolesPage
+  key: "roles",
+  app_id: 1001,
+  name: "Roles",
+  routes: [
+    { path: "/roles", component: RolesPage },
+  ],
 };`;
 
 const SNIPPET_MODULE_DEPLOY_CHECKLIST = `Before release:
@@ -962,12 +1004,12 @@ const MODULE_CREATION_STEPS = [
           <p className={styles.ruleHeading}>Strict Rules (Non-Negotiable)</p>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem" }}>
             <div>
-              <p style={{ fontWeight: "600", marginBottom: "0.5rem", color: "#d32f2f" }}>NEVER call Supabase directly from:</p>
+              <p style={{ fontWeight: "600", marginBottom: "0.5rem", color: "#d32f2f" }}>NEVER call Supabase (<code>.from()</code>) directly from:</p>
               <ul style={{ marginTop: "0.5rem", paddingLeft: "1.5rem" }}>
                 <li>components</li>
                 <li>pages</li>
                 <li>hooks</li>
-                <li>services</li>
+                <li>services (use utils/supabase.js to get the client, then pass it to repo)</li>
               </ul>
             </div>
             <div>
@@ -1126,12 +1168,12 @@ const MODULE_CREATION_STEPS = [
                   </p>
                   <p>This is now:</p>
                   <ul style={{ marginTop: "0.5rem", paddingLeft: "1.5rem" }}>
-                    <li>? Real DB (your table)</li>
-                    <li>? Real CRUD</li>
-                    <li>? Clean separation</li>
-                    <li>? No overengineering</li>
-                    <li>? No DTO/interface bloat</li>
-                    <li>? Still scalable</li>
+                    <li>✅ Real DB (your table)</li>
+                    <li>✅ Real CRUD</li>
+                    <li>✅ Clean separation</li>
+                    <li>✅ No overengineering</li>
+                    <li>✅ No DTO/interface bloat</li>
+                    <li>✅ Still scalable</li>
                   </ul>
                 </div>
               )
@@ -1146,8 +1188,8 @@ const MODULE_CREATION_STEPS = [
                   </p>
                   <p>This line:</p>
                   <pre style={{ margin: "0.5rem 0", padding: "0.5rem", backgroundColor: "#fff", borderRadius: "4px", overflow: "auto" }}>return data.map(mapRole);</pre>
-                  <p style={{ marginTop: "0.5rem" }}>?? That's your entire protection layer</p>
-                  <p>Remove that ? your system degrades fast.</p>
+                  <p style={{ marginTop: "0.5rem" }}>⚠️ That&apos;s your entire protection layer</p>
+                  <p>Remove that — your system degrades fast.</p>
                 </div>
               )
             }

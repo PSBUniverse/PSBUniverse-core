@@ -6,8 +6,9 @@ function buildPath(segments) {
   return `/${segments.join("/")}`;
 }
 
-export default async function ModuleRoutePage({ params }) {
+export default async function ModuleRoutePage({ params, searchParams }) {
   const resolvedParams = await params;
+  const resolvedSearchParams = await searchParams;
   const currentPath = buildPath(resolvedParams?.modulePath || []);
   const modules = await loadModules();
 
@@ -37,7 +38,7 @@ export default async function ModuleRoutePage({ params }) {
 
       return (
         <ModuleAccessGate appId={moduleDefinition.app_id}>
-          <Component />
+          <Component searchParams={resolvedSearchParams} />
         </ModuleAccessGate>
       );
     }

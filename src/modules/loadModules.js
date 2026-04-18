@@ -28,7 +28,14 @@ export async function loadModules() {
       continue;
     }
 
-    const importedModule = await import(/* webpackIgnore: true */ pathToFileURL(modulePath).href);
+    const moduleUrl = pathToFileURL(modulePath);
+
+    // Raw file URL imports are cached by Node. Bust cache in dev so module edits appear immediately.
+    if (process.env.NODE_ENV !== "production") {
+      moduleUrl.searchParams.set("t", String(Date.now()));
+    }
+
+    const importedModule = await import(/* webpackIgnore: true */ moduleUrl.href);
     const moduleDefinition = importedModule.default ?? importedModule;
     modules.push(moduleDefinition);
   }

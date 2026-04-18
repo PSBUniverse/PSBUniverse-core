@@ -28,14 +28,22 @@ Module responsibility is:
 Create module at repository root under modules.
 
 ```text
-modules/
-  gutter/
-    src/
-      index.js
-      pages/
-        DashboardPage.js
-      services/
-        cards.service.js
+src/modules/<APP_NAME> (Roles)/
+  src/
+    index.js
+    pages/
+      RolesPage.jsx
+    components/
+      RolesTable.jsx
+    services/
+      useRoles.js
+    repo/
+      roles.repo.js
+    model/
+      roles.model.js
+    hooks/
+      useRolesTable.js
+    utils/
 ```
 
 Minimum required file:

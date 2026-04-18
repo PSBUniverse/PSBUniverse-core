@@ -3,6 +3,7 @@ export { default as Dropdown } from "@/shared/components/ui/controls/Dropdown";
 export { default as Card } from "@/shared/components/ui/surface/Card";
 export { default as Modal } from "@/shared/components/ui/overlay/Modal";
 export { default as Table } from "@/shared/components/ui/table/Table";
+export { default as SetupTable } from "@/shared/components/ui/table/SetupTable";
 export { default as ActionColumn } from "@/shared/components/ui/table/ActionColumn";
 export { default as Badge } from "@/shared/components/ui/feedback/Badge";
 export { default as Input } from "@/shared/components/ui/controls/Input";

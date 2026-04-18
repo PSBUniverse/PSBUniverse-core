@@ -304,6 +304,176 @@
   color: #173348;
 }
 
+.psb-setup-action-btn {
+  color: #678095;
+  background: transparent;
+  border-color: transparent;
+  transition:
+    color var(--psb-transition-150) ease,
+    background-color var(--psb-transition-150) ease,
+    border-color var(--psb-transition-150) ease,
+    box-shadow var(--psb-transition-150) ease;
+}
+
+.psb-setup-action-btn:hover,
+.psb-setup-action-btn:focus-visible {
+  color: #678095;
+  background: transparent;
+  border-color: transparent;
+}
+
+.psb-setup-action-btn:active,
+.psb-setup-action-btn.active {
+  color: #678095;
+  background: transparent;
+  border-color: transparent;
+}
+
+.psb-setup-action-btn .bi {
+  font-size: 0.9rem;
+}
+
+.psb-setup-action-drag {
+  color: #678095;
+}
+
+.psb-setup-action-drag,
+.psb-setup-action-drag:hover,
+.psb-setup-action-drag:focus-visible {
+  cursor: grab;
+}
+
+.psb-setup-action-drag:active {
+  cursor: grabbing;
+}
+
+.psb-setup-action-edit {
+  color: #678095;
+}
+
+.psb-setup-action-toggle-disable {
+  color: #678095;
+}
+
+.psb-setup-action-toggle-enable {
+  color: #678095;
+}
+
+.psb-setup-action-delete {
+  color: #678095;
+}
+
+.psb-setup-row:hover .psb-setup-action-drag:not(:disabled) {
+  color: #547188;
+}
+
+.psb-setup-row:hover .psb-setup-action-edit:not(:disabled) {
+  color: #1f6b95;
+}
+
+.psb-setup-row:hover .psb-setup-action-toggle-disable:not(:disabled) {
+  color: #a3650b;
+}
+
+.psb-setup-row:hover .psb-setup-action-toggle-enable:not(:disabled) {
+  color: #13795b;
+}
+
+.psb-setup-row:hover .psb-setup-action-delete:not(:disabled) {
+  color: #b02d2d;
+}
+
+.psb-batch-chip {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  font-size: 0.69rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  padding: 0.16rem 0.5rem;
+  text-transform: uppercase;
+}
+
+.psb-batch-chip-added {
+  color: #12654c;
+  background: #dcf5eb;
+  border-color: #b9e6d5;
+}
+
+.psb-batch-chip-edited {
+  color: #17527a;
+  background: #e7f2ff;
+  border-color: #bfdaf6;
+}
+
+.psb-batch-chip-deleted {
+  color: #8f2323;
+  background: #ffeaea;
+  border-color: #f7c8c8;
+}
+
+.psb-batch-chip-order {
+  color: #6c4a00;
+  background: #fff3d3;
+  border-color: #f2dca2;
+}
+
+.psb-batch-marker {
+  display: inline-flex;
+  margin-left: 0.45rem;
+  border-radius: 999px;
+  padding: 0.07rem 0.38rem;
+  font-size: 0.62rem;
+  line-height: 1.2;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  vertical-align: middle;
+}
+
+.psb-batch-marker-new {
+  color: #12654c;
+  background: #dff5ea;
+  border: 1px solid #bde7d4;
+}
+
+.psb-batch-marker-edited {
+  color: #17527a;
+  background: #e8f3ff;
+  border: 1px solid #c3ddf8;
+}
+
+.psb-batch-marker-deleted {
+  color: #8f2323;
+  background: #ffe9e9;
+  border: 1px solid #f5c6c6;
+}
+
+.psb-batch-row-new td {
+  background: #eefaf4 !important;
+}
+
+.psb-batch-row-edited td {
+  background: #f2f8ff !important;
+}
+
+.psb-batch-row-new:hover td {
+  background: #e2f4ea !important;
+}
+
+.psb-batch-row-edited:hover td {
+  background: #e6f2ff !important;
+}
+
+.psb-batch-row-deleted td {
+  background: #fff1f1 !important;
+}
+
+.psb-batch-row-deleted:hover td {
+  background: #ffe6e6 !important;
+}
+
 .psb-ui-card {
   border: 1px solid #d3e0ea;
   box-shadow: 0 8px 22px rgba(18, 53, 81, 0.08);
