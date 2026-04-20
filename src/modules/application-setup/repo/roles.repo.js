@@ -78,36 +78,18 @@ export async function updateRoleById(supabase, roleId, updates) {
   }
 }
 
-function isMissingTableError(error) {
-  return String(error?.code || "").trim() === "42P01";
-}
-
-export async function clearRoleMappings(supabase, roleId) {
-  try {
-    const { error } = await supabase
-      .from("psb_m_userapproleaccess")
-      .delete()
-      .eq("role_id", roleId);
-
-    if (error && !isMissingTableError(error)) throw error;
-    return true;
-  } catch (err) {
-    throw new Error(err.message || "Failed to clear role mappings");
-  }
-}
-
 export async function deleteRoleById(supabase, roleId) {
-  await clearRoleMappings(supabase, roleId);
-
   try {
-    const { error } = await supabase
+    const { data, error } = await supabase
       .from("psb_s_role")
-      .delete()
-      .eq("role_id", roleId);
+      .update({ is_active: false })
+      .eq("role_id", roleId)
+      .select("*")
+      .single();
 
     if (error) throw error;
-    return true;
+    return data;
   } catch (err) {
-    throw new Error(err.message || "Failed to delete role");
+    throw new Error(err.message || "Failed to deactivate role");
   }
 }

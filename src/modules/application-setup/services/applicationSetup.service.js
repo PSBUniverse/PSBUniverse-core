@@ -183,6 +183,8 @@ export async function deleteApplicationRecord(supabase, appId) {
 
   return {
     deletedRoleCount: roles.length,
+    deactivatedRoleCount: roles.length,
+    deactivated: true,
     appId,
   };
 }
@@ -218,6 +220,7 @@ export async function deleteRoleRecord(supabase, roleId) {
   await deleteRoleById(supabase, roleId);
   return {
     roleId,
+    deactivated: true,
     deleted: true,
   };
 }

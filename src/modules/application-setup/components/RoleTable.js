@@ -146,7 +146,7 @@ export function RoleTable({ selectedApp, appRoles }) {
                   borderRadius: '4px',
                   color: '#adb5bd',
                 },
-                title: 'Delete action available in full admin setup',
+                title: 'Deactivate action available in full admin setup',
               },
               React.createElement('i', { className: 'bi bi-trash', 'aria-hidden': 'true' }),
             ),

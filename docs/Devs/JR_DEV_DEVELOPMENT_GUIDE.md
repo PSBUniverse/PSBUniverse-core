@@ -121,11 +121,10 @@ If your task needs any forbidden action:
 Required structure:
 
 ```text
-modules/<module-name>/
-  src/
-    index.js
-    pages/
-    components/
+src/modules/<module-name>/
+   index.js
+   pages/
+   components/
 ```
 
 Purpose:

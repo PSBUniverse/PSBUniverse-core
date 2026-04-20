@@ -25,29 +25,28 @@ Module responsibility is:
 
 ## 2) Required Module Structure
 
-Create module at repository root under modules.
+Create module under src/modules.
 
 ```text
 src/modules/<APP_NAME> (Roles)/
-  src/
-    index.js
-    pages/
-      RolesPage.jsx
-    components/
-      RolesTable.jsx
-    services/
-      useRoles.js
-    repo/
-      roles.repo.js
-    model/
-      roles.model.js
-    hooks/
-      useRolesTable.js
-    utils/
+  index.js
+  pages/
+    RolesPage.jsx
+  components/
+    RolesTable.jsx
+  services/
+    useRoles.js
+  repo/
+    roles.repo.js
+  model/
+    roles.model.js
+  hooks/
+    useRolesTable.js
+  utils/
 ```
 
 Minimum required file:
-1. modules/<module-name>/src/index.js
+1. src/modules/<module-name>/index.js
 
 ## 3) Required Module Definition Contract
 
@@ -78,7 +77,7 @@ Field meaning:
 
 ## 4) How Modules Plug Into Core
 
-1. Core loader scans modules/*/src/index.js.
+1. Core loader scans src/modules/*/index.js.
 2. Core imports module definitions at runtime.
 3. Core dashboard lists modules user can access.
 4. Core route resolver matches URL to module route.

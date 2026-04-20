@@ -22,7 +22,7 @@ This route receives URL path segments and resolves them against module definitio
 
 Each module must export a route manifest from:
 
-1. modules/<module-name>/src/index.js
+1. src/modules/<module-name>/index.js
 
 Expected shape:
 
@@ -49,8 +49,8 @@ Mandatory fields:
 ## 3) How Core Loads Route Definitions
 
 Implemented in src/modules/loadModules.js:
-1. Read root modules directory.
-2. For each folder, look for src/index.js.
+1. Read src/modules directory (canonical location).
+2. For each folder, look for index.js.
 3. Import default export as module definition.
 4. Return array of modules.
 

@@ -61,6 +61,7 @@ function SortableBodyRow({
   rowIndex,
   rowId,
   columns,
+  actionColumnVisible,
   rowClickable,
   isSelected,
   onRowClick,
@@ -85,13 +86,15 @@ function SortableBodyRow({
       className={["psb-setup-row", rowClassName, isSelected ? "psb-setup-row-selected" : ""].filter(Boolean).join(" ")}
       onClick={rowClickable ? () => onRowClick(row) : undefined}
     >
-      <ActionCell
-        row={row}
-        rowIndex={rowIndex}
-        draggable={draggable}
-        dragHandleProps={{ ...attributes, ...listeners }}
-        renderActions={renderActions}
-      />
+      {actionColumnVisible ? (
+        <ActionCell
+          row={row}
+          rowIndex={rowIndex}
+          draggable={draggable}
+          dragHandleProps={{ ...attributes, ...listeners }}
+          renderActions={renderActions}
+        />
+      ) : null}
       {columns.map((column) => {
         const rawValue = row?.[column.key];
         const rendered = typeof column.render === "function" ? column.render(row, rawValue, rowIndex) : renderValue(rawValue);
@@ -111,6 +114,7 @@ function StaticBodyRow({
   rowIndex,
   rowId,
   columns,
+  actionColumnVisible,
   rowClickable,
   isSelected,
   onRowClick,
@@ -127,7 +131,9 @@ function StaticBodyRow({
       className={["psb-setup-row", rowClassName, isSelected ? "psb-setup-row-selected" : ""].filter(Boolean).join(" ")}
       onClick={rowClickable ? () => onRowClick(row) : undefined}
     >
-      <ActionCell row={row} rowIndex={rowIndex} draggable={draggable} renderActions={renderActions} />
+      {actionColumnVisible ? (
+        <ActionCell row={row} rowIndex={rowIndex} draggable={draggable} renderActions={renderActions} />
+      ) : null}
       {columns.map((column) => {
         const rawValue = row?.[column.key];
         const rendered = typeof column.render === "function" ? column.render(row, rawValue, rowIndex) : renderValue(rawValue);
@@ -149,6 +155,8 @@ export default function SetupTable({
   selectedRowId = null,
   onRowClick,
   renderActions,
+  showActionColumn = true,
+  onHeaderContextMenu,
   draggable = false,
   onReorder,
   emptyMessage = "No records found.",
@@ -169,6 +177,16 @@ export default function SetupTable({
 
   const rowClickable = typeof onRowClick === "function";
   const hasRows = normalizedRows.length > 0;
+  const actionColumnVisible = showActionColumn === true;
+
+  const handleHeaderContextMenu = useCallback(
+    (event, column = null) => {
+      if (typeof onHeaderContextMenu === "function") {
+        onHeaderContextMenu(event, column);
+      }
+    },
+    [onHeaderContextMenu],
+  );
 
   const handleDragEnd = useCallback(
     (event) => {
@@ -198,7 +216,7 @@ export default function SetupTable({
   const tableBody = !hasRows ? (
     <tbody>
       <tr>
-        <td colSpan={normalizedColumns.length + 1} className="text-muted text-center py-3">
+        <td colSpan={normalizedColumns.length + (actionColumnVisible ? 1 : 0)} className="text-muted text-center py-3">
           {emptyMessage}
         </td>
       </tr>
@@ -213,6 +231,7 @@ export default function SetupTable({
             rowIndex={index}
             rowId={rowId}
             columns={normalizedColumns}
+            actionColumnVisible={actionColumnVisible}
             rowClickable={rowClickable}
             isSelected={String(selectedRowId ?? "") === String(row?.[rowIdKey] ?? "")}
             onRowClick={onRowClick}
@@ -235,6 +254,7 @@ export default function SetupTable({
           rowIndex={index}
           rowId={rowId}
           columns={normalizedColumns}
+          actionColumnVisible={actionColumnVisible}
           rowClickable={rowClickable}
           isSelected={String(selectedRowId ?? "") === String(row?.[rowIdKey] ?? "")}
           onRowClick={onRowClick}
@@ -251,11 +271,19 @@ export default function SetupTable({
 
   const tableMarkup = (
     <table className="table table-sm table-hover mb-0" style={{ width: "100%", tableLayout: "fixed" }}>
-      <thead className="table-light">
+      <thead className="table-light" onContextMenu={(event) => handleHeaderContextMenu(event, null)}>
         <tr>
-          <th style={{ width: 140, verticalAlign: "middle" }}>Actions</th>
+          {actionColumnVisible ? (
+            <th style={{ width: 140, verticalAlign: "middle" }} onContextMenu={(event) => handleHeaderContextMenu(event, null)}>
+              Actions
+            </th>
+          ) : null}
           {normalizedColumns.map((column) => (
-            <th key={column.key} style={{ width: column?.width, textAlign: column?.align || "left", verticalAlign: "middle" }}>
+            <th
+              key={column.key}
+              style={{ width: column?.width, textAlign: column?.align || "left", verticalAlign: "middle" }}
+              onContextMenu={(event) => handleHeaderContextMenu(event, column)}
+            >
               {column.label}
             </th>
           ))}

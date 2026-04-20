@@ -65,15 +65,17 @@ export async function updateApplicationById(supabase, appId, updates) {
 
 export async function deleteApplicationById(supabase, appId) {
   try {
-    const { error } = await supabase
+    const { data, error } = await supabase
       .from("psb_s_application")
-      .delete()
-      .eq("app_id", appId);
+      .update({ is_active: false })
+      .eq("app_id", appId)
+      .select("*")
+      .single();
 
     if (error) throw error;
-    return true;
+    return data;
   } catch (err) {
-    throw new Error(err.message || "Failed to delete application");
+    throw new Error(err.message || "Failed to deactivate application");
   }
 }
 

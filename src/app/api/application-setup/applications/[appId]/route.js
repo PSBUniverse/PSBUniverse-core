@@ -1,9 +1,9 @@
 import { NextResponse } from "next/server";
-import { getSupabase } from "../../../../../../modules/application-setup/src/utils/supabase.js";
+import { getSupabase } from "@/modules/application-setup/utils/supabase.js";
 import {
   deleteApplicationRecord,
   updateApplicationRecord,
-} from "../../../../../../modules/application-setup/src/services/applicationSetup.service.js";
+} from "@/modules/application-setup/services/applicationSetup.service.js";
 
 export const dynamic = "force-dynamic";
 
@@ -98,7 +98,7 @@ export async function DELETE(request, context) {
     return NextResponse.json(
       {
         ok: false,
-        error: error?.message || "Failed to delete application.",
+        error: error?.message || "Failed to deactivate application.",
       },
       { status: 500, headers: noStoreHeaders() },
     );

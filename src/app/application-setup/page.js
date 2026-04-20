@@ -1,6 +1,6 @@
 import ModuleAccessGate from "@/core/auth/ModuleAccessGate";
 import ApplicationSetupClient from "./ApplicationSetupClient";
-import { loadApplicationSetupData } from "../../../modules/application-setup/src/hooks/applicationSetupData.js";
+import { loadApplicationSetupData } from "@/modules/application-setup/hooks/applicationSetupData.js";
 
 function parseAppId(value) {
   if (value === undefined || value === null || value === "") {

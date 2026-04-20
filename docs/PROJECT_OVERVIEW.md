@@ -129,7 +129,7 @@ Login request
 | src/core/auth/access.js | hasAppAccess and hasCardAccess helpers |
 | src/core/auth/DashboardModules.js | Filters module list by app access |
 | src/core/auth/ModuleAccessGate.js | Blocks unauthorized module routes |
-| src/modules/loadModules.js | Discovers module definitions from root modules folder |
+| src/modules/loadModules.js | Discovers module definitions from src/modules module index files |
 | src/app/[...modulePath]/page.js | Dynamic route resolution + core access gate |
 | src/middleware.js | Redirects unauthenticated requests to /login |
 
@@ -150,7 +150,7 @@ Login request
 
 ## 10) Current Constraints
 
-1. Root modules folder is currently empty.
+1. src/modules is now the canonical module location.
 2. Card-level filtering behavior is available in core helper but depends on module implementation.
 3. supabase/migrations folder exists but currently has no SQL files.
 

@@ -954,6 +954,115 @@
   font-size: 0.85rem;
 }
 
+.umsp-shell {
+  position: relative;
+  min-height: calc(100vh - 120px);
+}
+
+.umsp-users-pane {
+  transition: opacity 180ms ease, filter 180ms ease;
+}
+
+.umsp-users-pane.is-panel-open {
+  opacity: 0.72;
+  filter: saturate(0.82);
+}
+
+.umsp-sidepanel {
+  position: fixed;
+  top: 0;
+  right: 0;
+  width: min(560px, 96vw);
+  height: 100vh;
+  background: #ffffff;
+  border-left: 1px solid #d5e2ec;
+  box-shadow: -12px 0 30px rgba(18, 53, 81, 0.2);
+  transform: translateX(102%);
+  transition: transform 220ms ease;
+  z-index: 1200;
+  overflow-y: auto;
+  padding: 1rem;
+  pointer-events: none;
+}
+
+.umsp-sidepanel.is-open {
+  transform: translateX(0);
+  pointer-events: auto;
+}
+
+.umsp-sidepanel-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 0.75rem;
+  padding-bottom: 0.75rem;
+  border-bottom: 1px solid #dbe7f0;
+}
+
+.umsp-sidepanel-loading {
+  color: #4f6d84;
+  font-weight: 600;
+  font-size: 0.9rem;
+  padding: 1rem 0;
+}
+
+.umsp-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  padding-top: 0.75rem;
+}
+
+.umsp-tab-btn {
+  border: 1px solid #c8d9e7;
+  border-radius: 999px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #2f5874;
+}
+
+.umsp-tab-btn.is-active {
+  background: #e6f3ff;
+  border-color: #98c4e6;
+  color: #19496c;
+}
+
+.umsp-tab-description {
+  margin-top: 0.75rem;
+  padding: 0.55rem 0.65rem;
+  border: 1px solid #d8e5ef;
+  border-radius: 8px;
+  background: #f7fbff;
+  color: #45657d;
+  font-size: 0.84rem;
+}
+
+.umsp-tab-content {
+  margin-top: 0.75rem;
+}
+
+.umsp-access-editor {
+  border: 1px solid #d7e5ef;
+  border-radius: 8px;
+  background: #f8fbff;
+  padding: 0.65rem;
+}
+
+.umsp-sidepanel-footer {
+  position: sticky;
+  bottom: -1rem;
+  display: flex;
+  gap: 0.45rem;
+  justify-content: flex-end;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.2) 0%, #ffffff 30%);
+  padding-top: 0.9rem;
+  padding-bottom: 0.25rem;
+  margin-top: 0.9rem;
+  border-top: 1px solid #dfeaf2;
+}
+
 .psb-ui-table thead th {
   background: #f6faff;
   color: #5f7386;
@@ -997,6 +1106,22 @@
 
   .psb-ui-table-filters-toggle {
     font-size: 0.74rem;
+  }
+
+  .umsp-users-pane.is-panel-open {
+    opacity: 0.62;
+  }
+
+  .umsp-sidepanel {
+    width: 100vw;
+  }
+
+  .umsp-sidepanel-footer {
+    justify-content: stretch;
+  }
+
+  .umsp-sidepanel-footer .btn {
+    flex: 1 1 0;
   }
 
   .psb-ui-table-pagination,

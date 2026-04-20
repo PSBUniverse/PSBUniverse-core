@@ -399,18 +399,17 @@ const SNIPPET_TOKENS = `/* Design tokens \u2014 from src/styles/variables.css */
 /* Transitions */
 --psb-transition-150  --psb-transition-200`;
 
-const SNIPPET_MODULE_STRUCTURE = `modules/<module-name>/
-  src/
-    index.js
-    pages/
-    components/
-    hooks/
-    services/
-    repo/
-      <module>.repo.js
-    model/
-      <module>.model.js
-    utils/`;
+const SNIPPET_MODULE_STRUCTURE = `src/modules/<module-name>/
+  index.js
+  pages/
+  components/
+  hooks/
+  services/
+  repo/
+    <module>.repo.js
+  model/
+    <module>.model.js
+  utils/`;
 
 const SNIPPET_MODULE_MANIFEST = `import DashboardPage from "./pages/DashboardPage";
 
@@ -424,7 +423,7 @@ export default {
   ],
 };`;
 
-const SNIPPET_MODULE_BUILD_SEQUENCE = `1. Create folder: modules/<module-name>/src/
+const SNIPPET_MODULE_BUILD_SEQUENCE = `1. Create folder: src/modules/<module-name>/
 2. Register app in psb_s_application
 3. Create groups in psb_m_appcardgroup
 4. Create cards in psb_s_appcard
