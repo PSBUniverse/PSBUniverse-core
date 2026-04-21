@@ -2,105 +2,119 @@
 
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import { Form, Spinner, Table as BootstrapTable } from "react-bootstrap";
-import Button from "@/shared/components/ui/controls/Button";
 import SearchBar from "@/shared/components/ui/controls/SearchBar";
-import ActionColumn from "@/shared/components/ui/table/ActionColumn";
-import TableContextMenu from "@/shared/components/ui/table/TableContextMenu";
-import TableSidePanel from "@/shared/components/ui/table/TableSidePanel";
+import { TableContextMenuWrapper } from "@/shared/components/ui/table/TableContextMenu";
+import { TableSidePanelWrapper } from "@/shared/components/ui/table/TableSidePanel";
 import { createFilterConfig, TABLE_FILTER_TYPES } from "@/shared/components/ui/table/filterSchema";
+import { useTableActions } from "@/shared/components/ui/table/tableActions";
+import { useTableBatchEdit } from "@/shared/components/ui/table/tableBatchEdit";
+import {
+  buildColumnVisibility,
+  buildSidePanelColumns,
+  getVisibleColumns,
+  normalizeColumns,
+  normalizeColumnSizing,
+} from "@/shared/components/ui/table/tableColumns";
+import { useTableDragNDrop } from "@/shared/components/ui/table/tableDragNDrop";
+import { renderTableBody } from "@/shared/components/ui/table/tableRender";
+import { useTableState } from "@/shared/components/ui/table/tableState";
+import {
+  ACTION_COLUMN_VISIBILITY_KEY,
+  buildPageList,
+  DEFAULT_PAGE_SIZE,
+  DEFAULT_PAGE_SIZE_OPTIONS,
+  DEFAULT_SEARCH_DEBOUNCE_MS,
+  getNestedValue,
+  getDateRangeValue,
+  isEmptyFilterValue,
+  isPlainObject,
+  normalizeFilterOptions,
+  normalizePageSizeOptions,
+  toIntegerOrFallback,
+} from "@/shared/components/ui/table/tableUtils";
 
-const DEFAULT_SEARCH_DEBOUNCE_MS = 350;
-const DEFAULT_PAGE_SIZE = 50;
-const DEFAULT_PAGE_SIZE_OPTIONS = [5, 10, 20, 30, 50, 100, 500];
-const DEFAULT_MIN_COLUMN_WIDTH = 96;
-const ACTION_COLUMN_VISIBILITY_KEY = "__psb_action_column__";
-const ACTION_COLUMN_WIDTH = 112;
+const ACTION_COLUMN_WIDTH = 96;
 
-const BATCH_TYPE_CREATED = "create";
-const BATCH_TYPE_UPDATED = "update";
-const BATCH_TYPE_DELETED = "delete";
-
-const BATCH_STATE_NONE = "none";
-const BATCH_STATE_CREATED = "created";
-const BATCH_STATE_UPDATED = "updated";
-const BATCH_STATE_DELETED = "deleted";
-
-function normalizeBatchType(value) {
-  const raw = String(value || "").trim().toLowerCase();
-
-  if (!raw) return "";
-  if (raw === BATCH_TYPE_CREATED || raw === BATCH_STATE_CREATED || raw === "new") return BATCH_TYPE_CREATED;
-  if (raw === BATCH_TYPE_UPDATED || raw === BATCH_STATE_UPDATED || raw === "edited") return BATCH_TYPE_UPDATED;
-  if (raw === BATCH_TYPE_DELETED || raw === BATCH_STATE_DELETED || raw === "deactivated") return BATCH_TYPE_DELETED;
-
-  return "";
+function normalizeSortDirection(direction) {
+  return String(direction || "").toLowerCase() === "desc" ? "desc" : "asc";
 }
 
-function inferBatchTypeFromText(value) {
-  const raw = String(value || "").trim().toLowerCase();
-  if (!raw) return "";
-
-  if (/(delete|deactivate|remove|archive)/.test(raw)) return BATCH_TYPE_DELETED;
-  if (/(create|add|new)/.test(raw)) return BATCH_TYPE_CREATED;
-  if (/(edit|update|toggle|enable|disable|save)/.test(raw)) return BATCH_TYPE_UPDATED;
-
-  return "";
-}
-
-function resolveBatchTypeFromAction(action) {
-  const explicitType = normalizeBatchType(
-    action?.batchType
-    || action?.batchEventType
-    || action?.mutationType
-    || action?.intent,
-  );
-
-  if (explicitType) {
-    return explicitType;
+function normalizeSortingState(rawSorting) {
+  if (!isPlainObject(rawSorting)) {
+    return {
+      key: "",
+      direction: "",
+    };
   }
 
-  const inferredType = inferBatchTypeFromText(`${action?.key || ""} ${action?.label || ""}`);
-  return inferredType || BATCH_TYPE_UPDATED;
+  const key = String(rawSorting.key || "").trim();
+  return {
+    key,
+    direction: key ? normalizeSortDirection(rawSorting.direction) : "",
+  };
 }
 
-function normalizeBatchState(value) {
-  const raw = String(value || "").trim().toLowerCase();
+function toDateTimestamp(value) {
+  if (value === undefined || value === null || value === "") {
+    return Number.NaN;
+  }
 
-  if (!raw || raw === BATCH_STATE_NONE) return BATCH_STATE_NONE;
-  if (raw === BATCH_STATE_CREATED || raw === "new") return BATCH_STATE_CREATED;
-  if (raw === BATCH_STATE_UPDATED || raw === "edited") return BATCH_STATE_UPDATED;
-  if (raw === BATCH_STATE_DELETED || raw === "deactivated") return BATCH_STATE_DELETED;
-
-  return BATCH_STATE_NONE;
+  const parsed = Date.parse(String(value));
+  return Number.isFinite(parsed) ? parsed : Number.NaN;
 }
 
-function resolveNextBatchState(currentBatchState, batchType) {
-  const normalizedState = normalizeBatchState(currentBatchState);
-  const normalizedType = normalizeBatchType(batchType);
+function compareSortValues(left, right) {
+  const leftNumber = Number(left);
+  const rightNumber = Number(right);
+  const bothNumeric = Number.isFinite(leftNumber) && Number.isFinite(rightNumber);
 
-  if (normalizedType === BATCH_TYPE_CREATED) {
-    return BATCH_STATE_CREATED;
+  if (bothNumeric) {
+    return leftNumber - rightNumber;
   }
 
-  if (normalizedType === BATCH_TYPE_DELETED) {
-    return BATCH_STATE_DELETED;
+  const leftDate = toDateTimestamp(left);
+  const rightDate = toDateTimestamp(right);
+  const bothDates = Number.isFinite(leftDate) && Number.isFinite(rightDate);
+
+  if (bothDates) {
+    return leftDate - rightDate;
   }
 
-  if (normalizedType === BATCH_TYPE_UPDATED) {
-    return normalizedState === BATCH_STATE_CREATED ? BATCH_STATE_CREATED : BATCH_STATE_UPDATED;
-  }
-
-  return normalizedState;
+  return String(left ?? "").localeCompare(String(right ?? ""), undefined, {
+    sensitivity: "base",
+    numeric: true,
+  });
 }
 
-function resolveBatchClassName(batchState) {
-  const normalizedState = normalizeBatchState(batchState);
+function matchesFilter(row, filter, filterValue) {
+  const rowValue = getNestedValue(row, filter.key);
 
-  if (normalizedState === BATCH_STATE_CREATED) return "psb-row-created";
-  if (normalizedState === BATCH_STATE_UPDATED) return "psb-row-updated";
-  if (normalizedState === BATCH_STATE_DELETED) return "psb-row-deleted";
+  if (filter.type === TABLE_FILTER_TYPES.DATERANGE) {
+    const range = getDateRangeValue(filterValue);
+    const start = toDateTimestamp(range.start);
+    const end = toDateTimestamp(range.end);
+    const rowTime = toDateTimestamp(rowValue);
 
-  return "";
+    if (!Number.isFinite(rowTime)) {
+      return false;
+    }
+
+    if (Number.isFinite(start) && rowTime < start) {
+      return false;
+    }
+
+    if (Number.isFinite(end) && rowTime > end) {
+      return false;
+    }
+
+    return true;
+  }
+
+  if (filter.type === TABLE_FILTER_TYPES.SELECT || filter.type === TABLE_FILTER_TYPES.DATE) {
+    return String(rowValue ?? "") === String(filterValue ?? "");
+  }
+
+  return String(rowValue ?? "").toLowerCase().includes(String(filterValue ?? "").toLowerCase());
 }
 
 function isDevEnvironment() {
@@ -113,180 +127,7 @@ function ensure(condition, message) {
   }
 }
 
-function isPlainObject(value) {
-  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
-}
-
-function toIntegerOrFallback(value, fallback) {
-  const parsed = Number(value);
-  return Number.isFinite(parsed) ? Math.trunc(parsed) : fallback;
-}
-
-function isEmptyFilterValue(value) {
-  if (value === undefined || value === null || value === "") {
-    return true;
-  }
-
-  if (Array.isArray(value)) {
-    return value.length === 0;
-  }
-
-  if (isPlainObject(value)) {
-    return Object.values(value).every((entry) => isEmptyFilterValue(entry));
-  }
-
-  return false;
-}
-
-function getDateRangeValue(rawValue) {
-  if (!isPlainObject(rawValue)) {
-    return {
-      start: "",
-      end: "",
-    };
-  }
-
-  return {
-    start: String(rawValue.start || ""),
-    end: String(rawValue.end || ""),
-  };
-}
-
-function normalizeColumns(columns) {
-  return (Array.isArray(columns) ? columns : []).map((column, index) => {
-    const key = String(column?.key || `column_${index}`).trim();
-    const configuredWidth = toIntegerOrFallback(column?.width, 0);
-    const configuredMinWidth = toIntegerOrFallback(column?.minWidth, DEFAULT_MIN_COLUMN_WIDTH);
-
-    const minWidth = Math.max(DEFAULT_MIN_COLUMN_WIDTH, configuredMinWidth);
-    const width = configuredWidth > 0 ? Math.max(configuredWidth, minWidth) : minWidth;
-
-    return {
-      ...column,
-      key,
-      label: String(column?.label || key),
-      sortable: column?.sortable === true,
-      resizable: column?.resizable !== false,
-      minWidth,
-      width,
-    };
-  });
-}
-
-function normalizeColumnSizing(rawColumnSizing, columns) {
-  const providedSizing = isPlainObject(rawColumnSizing) ? rawColumnSizing : {};
-  const normalized = {};
-
-  columns.forEach((column) => {
-    const providedWidth = toIntegerOrFallback(providedSizing[column.key], 0);
-    normalized[column.key] = providedWidth > 0 ? Math.max(providedWidth, column.minWidth) : column.width;
-  });
-
-  return normalized;
-}
-
-function normalizePagination(rawPagination) {
-  const page = Math.max(1, toIntegerOrFallback(rawPagination?.page, 1));
-  const pageSize = Math.max(1, toIntegerOrFallback(rawPagination?.pageSize, DEFAULT_PAGE_SIZE));
-  const total = Math.max(0, toIntegerOrFallback(rawPagination?.total, 0));
-
-  return {
-    page,
-    pageSize,
-    total,
-  };
-}
-
-function normalizeSortDirection(direction) {
-  return String(direction || "").toLowerCase() === "desc" ? "desc" : "asc";
-}
-
-function normalizeSorting(rawSorting) {
-  if (!isPlainObject(rawSorting)) {
-    return {
-      key: "",
-      direction: "",
-    };
-  }
-
-  const key = String(rawSorting.key || "").trim();
-
-  return {
-    key,
-    direction: key ? normalizeSortDirection(rawSorting.direction) : "",
-  };
-}
-
-function normalizeFilterOptions(options) {
-  if (!Array.isArray(options)) {
-    return [];
-  }
-
-  return options.map((option) => {
-    if (isPlainObject(option)) {
-      return {
-        label: String(option.label ?? option.value ?? ""),
-        value: option.value,
-      };
-    }
-
-    return {
-      label: String(option),
-      value: option,
-    };
-  });
-}
-
-function getNestedValue(target, path) {
-  if (!target || !path) {
-    return undefined;
-  }
-
-  return String(path)
-    .split(".")
-    .reduce((acc, segment) => (acc === undefined || acc === null ? undefined : acc[segment]), target);
-}
-
-function buildPageList(page, totalPages) {
-  if (totalPages <= 7) {
-    return Array.from({ length: totalPages }, (_, index) => index + 1);
-  }
-
-  const pageSet = new Set([1, totalPages, page, page - 1, page + 1, page - 2, page + 2]);
-  const sortedPages = Array.from(pageSet)
-    .filter((candidate) => candidate >= 1 && candidate <= totalPages)
-    .sort((left, right) => left - right);
-
-  const result = [];
-
-  sortedPages.forEach((candidate, index) => {
-    const previous = sortedPages[index - 1];
-
-    if (index > 0 && previous + 1 < candidate) {
-      result.push("ellipsis");
-    }
-
-    result.push(candidate);
-  });
-
-  return result;
-}
-
-function normalizePageSizeOptions(pageSizeOptions, currentPageSize) {
-  const values = Array.isArray(pageSizeOptions) ? pageSizeOptions : DEFAULT_PAGE_SIZE_OPTIONS;
-
-  const uniqueValues = new Set(
-    values
-      .map((value) => toIntegerOrFallback(value, 0))
-      .filter((value) => value > 0 && value <= 500),
-  );
-
-  uniqueValues.add(Math.min(500, Math.max(1, toIntegerOrFallback(currentPageSize, DEFAULT_PAGE_SIZE))));
-
-  return Array.from(uniqueValues).sort((left, right) => left - right);
-}
-
-function validateDataTableProps({
+function validateTableProps({
   data,
   columns,
   state,
@@ -294,24 +135,28 @@ function validateDataTableProps({
   actions,
   onChange,
   loading,
-  children,
+  controlled,
   batchMode,
   onBatchChange,
 }) {
-  ensure(children === undefined || children === null, "children are not supported in data table mode.");
   ensure(Array.isArray(data), "data must be an array.");
   ensure(Array.isArray(columns), "columns must be an array.");
-  ensure(isPlainObject(state), "state must be an object.");
   ensure(Array.isArray(filterConfig), "filterConfig must be an array.");
   ensure(Array.isArray(actions), "actions must be an array.");
-  ensure(typeof onChange === "function", "onChange must be a function.");
   ensure(typeof loading === "boolean", "loading must be a boolean.");
 
-  if (batchMode === true) {
-    ensure(typeof onBatchChange === "function", "onBatchChange must be a function when batchMode is enabled.");
+  if (controlled) {
+    ensure(isPlainObject(state), "state must be an object when using controlled mode.");
+    ensure(typeof onChange === "function", "onChange must be a function when using controlled mode.");
+    createFilterConfig(filterConfig);
   }
 
-  createFilterConfig(filterConfig);
+  if (batchMode === true) {
+    ensure(
+      typeof onBatchChange === "function" || typeof onChange === "function",
+      "onBatchChange or onChange must be provided when batchMode is enabled.",
+    );
+  }
 
   const usedColumnKeys = new Set();
 
@@ -321,7 +166,7 @@ function validateDataTableProps({
     const key = String(column.key || "").trim();
     ensure(key !== "", `column at index ${index} is missing key.`);
     ensure(key !== ACTION_COLUMN_VISIBILITY_KEY, `column key "${ACTION_COLUMN_VISIBILITY_KEY}" is reserved.`);
-    ensure(!usedColumnKeys.has(key), `column key \"${key}\" is duplicated.`);
+    ensure(!usedColumnKeys.has(key), `column key "${key}" is duplicated.`);
     usedColumnKeys.add(key);
 
     ensure(String(column.label || "").trim() !== "", `column ${key} is missing label.`);
@@ -338,37 +183,31 @@ function validateDataTableProps({
 
     const key = String(action.key || "").trim();
     ensure(key !== "", `action at index ${index} is missing key.`);
-    ensure(!usedActionKeys.has(key), `action key \"${key}\" is duplicated.`);
+    ensure(!usedActionKeys.has(key), `action key "${key}" is duplicated.`);
     usedActionKeys.add(key);
 
     ensure(String(action.label || "").trim() !== "", `action ${key} is missing label.`);
     ensure(typeof action.onClick === "function", `action ${key} onClick must be a function.`);
-
-    const actionType = String(action.type || "secondary").toLowerCase();
-    ensure(
-      actionType === "primary" || actionType === "secondary" || actionType === "danger",
-      `action ${key} has unsupported type \"${actionType}\".`,
-    );
-
-    if (action.visible !== undefined) {
-      ensure(typeof action.visible === "function", `action ${key} visible must be a function when provided.`);
-    }
-
-    if (action.disabled !== undefined) {
-      ensure(typeof action.disabled === "function", `action ${key} disabled must be a function when provided.`);
-    }
   });
 }
 
 export default function Table({
   data = [],
   columns = [],
-  state,
-  filterConfig = [],
+  rowIdKey = "id",
+  selectedRowId = null,
+  onRowClick,
   actions = [],
-  onChange,
+  showActionColumn = true,
   batchMode = false,
   onBatchChange,
+  onBatchSave,
+  draggable = false,
+  onReorder,
+  state,
+  filterConfig = [],
+  onChange,
+  onHeaderContextMenu,
   loading = false,
   className = "",
   emptyMessage = "No records found.",
@@ -377,87 +216,129 @@ export default function Table({
   searchDebounceMs = DEFAULT_SEARCH_DEBOUNCE_MS,
   pageSizeOptions = DEFAULT_PAGE_SIZE_OPTIONS,
   exportFormats = ["csv", "excel"],
-  children,
 }) {
   const tableId = useId();
+  const controlledMode = isPlainObject(state) && typeof onChange === "function";
+  const tableClassName = controlledMode
+    ? ["psb-ui-table", "psb-ui-data-table", className].filter(Boolean).join(" ")
+    : ["psb-ui-table", "psb-ui-data-table", "table-sm", "mb-0"].join(" ");
 
   if (isDevEnvironment()) {
-    validateDataTableProps({
+    validateTableProps({
       data,
       columns,
       state,
       filterConfig,
       actions,
       onChange,
+      loading,
+      controlled: controlledMode,
       batchMode,
       onBatchChange,
-      loading,
-      children,
     });
   }
 
-  const normalizedColumns = useMemo(() => normalizeColumns(columns), [columns]);
-  const actionColumnEnabled = Array.isArray(actions) && actions.length > 0;
-  const batchModeEnabled = batchMode === true && typeof onBatchChange === "function";
-  const normalizedFilterConfig = useMemo(() => createFilterConfig(filterConfig), [filterConfig]);
-  const normalizedPagination = useMemo(() => normalizePagination(state?.pagination), [state?.pagination]);
-  const normalizedSorting = useMemo(() => normalizeSorting(state?.sorting), [state?.sorting]);
-  const columnSizing = useMemo(
-    () => normalizeColumnSizing(state?.columnSizing, normalizedColumns),
-    [normalizedColumns, state?.columnSizing],
+  const dataset = useMemo(() => (Array.isArray(data) ? data : []), [data]);
+
+  const batch = useTableBatchEdit({
+    data: dataset,
+    rowIdKey,
+    batchMode,
+    onBatchChange,
+    onBatchSave,
+  });
+
+  const rows = batch.rows;
+
+  const tableState = useTableState({
+    controlled: controlledMode,
+    state,
+    filterConfig,
+    pageSizeOptions,
+    defaultPageSize: DEFAULT_PAGE_SIZE,
+    onChange,
+  });
+
+  const normalizedColumns = useMemo(
+    () => normalizeColumns(columns, { interactive: true }),
+    [columns],
   );
 
-  const filters = useMemo(() => (isPlainObject(state?.filters) ? state.filters : {}), [state?.filters]);
+  const actionColumnEnabled =
+    showActionColumn === true
+    && (draggable === true || (Array.isArray(actions) && actions.length > 0));
 
-  const columnVisibility = useMemo(() => {
-    const visibilityState = isPlainObject(state?.columnVisibility) ? state.columnVisibility : {};
-    const visibilityMap = {};
+  const [uncontrolledFilters, setUncontrolledFilters] = useState({});
+  const [uncontrolledSorting, setUncontrolledSorting] = useState({ key: "", direction: "" });
+  const [uncontrolledPage, setUncontrolledPage] = useState(1);
+  const [uncontrolledPageSize, setUncontrolledPageSize] = useState(DEFAULT_PAGE_SIZE);
+  const [uncontrolledColumnVisibility, setUncontrolledColumnVisibility] = useState({});
+  const [uncontrolledColumnSizing, setUncontrolledColumnSizing] = useState({});
 
-    if (actionColumnEnabled) {
-      visibilityMap[ACTION_COLUMN_VISIBILITY_KEY] = visibilityState[ACTION_COLUMN_VISIBILITY_KEY] !== false;
+  const effectiveFilters = controlledMode ? tableState.filters : uncontrolledFilters;
+  const effectiveSorting = controlledMode ? tableState.normalizedSorting : normalizeSortingState(uncontrolledSorting);
+  const effectiveColumnVisibilityState = controlledMode ? state?.columnVisibility : uncontrolledColumnVisibility;
+  const effectiveColumnSizingState = controlledMode ? state?.columnSizing : uncontrolledColumnSizing;
+
+  const columnSizing = useMemo(
+    () => normalizeColumnSizing(effectiveColumnSizingState, normalizedColumns),
+    [effectiveColumnSizingState, normalizedColumns],
+  );
+
+  const columnVisibility = useMemo(
+    () =>
+      buildColumnVisibility({
+        columnVisibilityState: effectiveColumnVisibilityState,
+        normalizedColumns,
+        actionColumnEnabled,
+      }),
+    [actionColumnEnabled, effectiveColumnVisibilityState, normalizedColumns],
+  );
+
+  const actionColumnVisible =
+    actionColumnEnabled
+    && columnVisibility[ACTION_COLUMN_VISIBILITY_KEY] !== false;
+
+  const visibleColumns = useMemo(
+    () => getVisibleColumns(normalizedColumns, columnVisibility),
+    [columnVisibility, normalizedColumns],
+  );
+
+  useEffect(() => {
+    if (controlledMode) {
+      return;
     }
 
-    normalizedColumns.forEach((column) => {
-      visibilityMap[column.key] = visibilityState[column.key] !== false;
+    setUncontrolledColumnVisibility((previous) => {
+      const next = {};
+
+      if (actionColumnEnabled) {
+        next[ACTION_COLUMN_VISIBILITY_KEY] = previous[ACTION_COLUMN_VISIBILITY_KEY] !== false;
+      }
+
+      normalizedColumns.forEach((column) => {
+        next[column.key] = previous[column.key] !== false;
+      });
+
+      if (normalizedColumns.length > 0 && normalizedColumns.every((column) => next[column.key] === false)) {
+        next[normalizedColumns[0].key] = true;
+      }
+
+      return next;
     });
+  }, [actionColumnEnabled, controlledMode, normalizedColumns]);
 
-    return visibilityMap;
-  }, [actionColumnEnabled, normalizedColumns, state?.columnVisibility]);
-
-  const actionColumnVisible = actionColumnEnabled && columnVisibility[ACTION_COLUMN_VISIBILITY_KEY] !== false;
-
-  const visibleColumns = useMemo(() => {
-    const nextVisibleColumns = normalizedColumns.filter((column) => columnVisibility[column.key] !== false);
-    return nextVisibleColumns.length > 0 ? nextVisibleColumns : normalizedColumns.slice(0, 1);
-  }, [columnVisibility, normalizedColumns]);
-
-  const totalPages = useMemo(
-    () => Math.max(1, Math.ceil(normalizedPagination.total / normalizedPagination.pageSize)),
-    [normalizedPagination.pageSize, normalizedPagination.total],
+  const getColumnWidth = useCallback(
+    (column) => {
+      const fromState = toIntegerOrFallback(columnSizing[column.key], column.width);
+      return Math.max(column.minWidth, fromState);
+    },
+    [columnSizing],
   );
-
-  const safePage = useMemo(
-    () => Math.min(Math.max(1, normalizedPagination.page), totalPages),
-    [normalizedPagination.page, totalPages],
-  );
-
-  const pageList = useMemo(() => buildPageList(safePage, totalPages), [safePage, totalPages]);
-
-  const firstVisibleIndex = normalizedPagination.total === 0 ? 0 : (safePage - 1) * normalizedPagination.pageSize + 1;
-  const lastVisibleIndex =
-    normalizedPagination.total === 0
-      ? 0
-      : Math.min(normalizedPagination.total, safePage * normalizedPagination.pageSize);
-
-  const normalizedPageSizeOptions = useMemo(
-    () => normalizePageSizeOptions(pageSizeOptions, normalizedPagination.pageSize),
-    [normalizedPagination.pageSize, pageSizeOptions],
-  );
-
-  const tableColSpan = visibleColumns.length + (actionColumnVisible ? 1 : 0);
 
   const [filtersExpanded, setFiltersExpanded] = useState(true);
   const [sidePanelOpen, setSidePanelOpen] = useState(false);
+  const [isBatchSubmitting, setIsBatchSubmitting] = useState(false);
   const [activeResizeColumnKey, setActiveResizeColumnKey] = useState("");
   const [contextMenuState, setContextMenuState] = useState({
     open: false,
@@ -468,113 +349,10 @@ export default function Table({
   const resizeStateRef = useRef(null);
   const columnSizingRef = useRef(columnSizing);
   const searchInputId = `${tableId}-search`;
-  const searchValue = String(filters.search || "");
 
   useEffect(() => {
     columnSizingRef.current = columnSizing;
   }, [columnSizing]);
-
-  const emitChange = useCallback(
-    (event) => {
-      onChange(event);
-    },
-    [onChange],
-  );
-
-  const getColumnWidth = useCallback(
-    (column) => {
-      const fromState = toIntegerOrFallback(columnSizing[column.key], column.width);
-      return Math.max(column.minWidth, fromState);
-    },
-    [columnSizing],
-  );
-
-  const handleSearchDebouncedChange = useCallback(
-    (nextValue) => {
-      emitChange({
-        type: "search",
-        value: String(nextValue || ""),
-      });
-    },
-    [emitChange],
-  );
-
-  const handleFilterValueChange = useCallback(
-    (filterKey, nextValue) => {
-      const nextFilters = {
-        ...filters,
-        [filterKey]: nextValue,
-      };
-
-      if (isEmptyFilterValue(nextValue)) {
-        delete nextFilters[filterKey];
-      }
-
-      emitChange({
-        type: "filters",
-        filters: nextFilters,
-      });
-    },
-    [emitChange, filters],
-  );
-
-  const handleSortToggle = useCallback(
-    (column) => {
-      if (!column.sortable) {
-        return;
-      }
-
-      const nextDirection =
-        normalizedSorting.key === column.key
-          ? normalizedSorting.direction === "asc"
-            ? "desc"
-            : "asc"
-          : "asc";
-
-      emitChange({
-        type: "sorting",
-        sorting: {
-          key: column.key,
-          direction: nextDirection,
-        },
-      });
-    },
-    [emitChange, normalizedSorting.direction, normalizedSorting.key],
-  );
-
-  const requestPage = useCallback(
-    (nextPage, nextPageSize = normalizedPagination.pageSize) => {
-      const safePageSize = Math.min(500, Math.max(1, toIntegerOrFallback(nextPageSize, normalizedPagination.pageSize)));
-      const boundedPage = Math.min(Math.max(1, toIntegerOrFallback(nextPage, 1)), Math.max(1, Math.ceil(normalizedPagination.total / safePageSize)));
-
-      emitChange({
-        type: "pagination",
-        pagination: {
-          page: boundedPage,
-          pageSize: safePageSize,
-        },
-      });
-    },
-    [emitChange, normalizedPagination.pageSize, normalizedPagination.total],
-  );
-
-  const handlePageSizeChange = useCallback(
-    (event) => {
-      const nextPageSize = Math.min(500, Math.max(1, toIntegerOrFallback(event.target.value, normalizedPagination.pageSize)));
-      requestPage(1, nextPageSize);
-    },
-    [normalizedPagination.pageSize, requestPage],
-  );
-
-  const handleHeaderContextMenu = useCallback((event) => {
-    event.preventDefault();
-
-    setContextMenuState({
-      open: true,
-      x: event.clientX,
-      y: event.clientY,
-    });
-  }, []);
 
   const closeContextMenu = useCallback(() => {
     setContextMenuState((current) => ({
@@ -583,23 +361,40 @@ export default function Table({
     }));
   }, []);
 
-  const handleOpenCustomization = useCallback(() => {
-    setSidePanelOpen(true);
-  }, []);
+  const handleHeaderContextMenu = useCallback(
+    (event, column = null) => {
+      event.preventDefault();
 
-  const startResize = useCallback((event, column) => {
-    event.preventDefault();
-    event.stopPropagation();
+      if (typeof onHeaderContextMenu === "function") {
+        onHeaderContextMenu(event, column);
+        return;
+      }
 
-    resizeStateRef.current = {
-      columnKey: column.key,
-      minWidth: column.minWidth,
-      startX: event.clientX,
-      startWidth: getColumnWidth(column),
-    };
+      setContextMenuState({
+        open: true,
+        x: event.clientX,
+        y: event.clientY,
+      });
+    },
+    [onHeaderContextMenu],
+  );
 
-    setActiveResizeColumnKey(column.key);
-  }, [getColumnWidth]);
+  const startResize = useCallback(
+    (event, column) => {
+      event.preventDefault();
+      event.stopPropagation();
+
+      resizeStateRef.current = {
+        columnKey: column.key,
+        minWidth: column.minWidth,
+        startX: event.clientX,
+        startWidth: getColumnWidth(column),
+      };
+
+      setActiveResizeColumnKey(column.key);
+    },
+    [getColumnWidth],
+  );
 
   const handleResizeMouseMove = useCallback(
     (event) => {
@@ -615,14 +410,18 @@ export default function Table({
         [columnKey]: nextWidth,
       };
 
-      emitChange({
-        type: "columnResize",
-        columnKey,
-        width: nextWidth,
-        columnSizing: nextColumnSizing,
-      });
+      if (controlledMode) {
+        tableState.emitChange({
+          type: "columnResize",
+          columnKey,
+          width: nextWidth,
+          columnSizing: nextColumnSizing,
+        });
+      } else {
+        setUncontrolledColumnSizing(nextColumnSizing);
+      }
     },
-    [emitChange],
+    [controlledMode, tableState],
   );
 
   const handleResizeMouseUp = useCallback(() => {
@@ -650,10 +449,10 @@ export default function Table({
       const visibleDataColumnCount = normalizedColumns.filter((column) => columnVisibility[column.key] !== false).length;
 
       if (
-        columnKey !== ACTION_COLUMN_VISIBILITY_KEY &&
-        !nextVisible &&
-        currentlyVisible &&
-        visibleDataColumnCount <= 1
+        columnKey !== ACTION_COLUMN_VISIBILITY_KEY
+        && !nextVisible
+        && currentlyVisible
+        && visibleDataColumnCount <= 1
       ) {
         return;
       }
@@ -663,140 +462,611 @@ export default function Table({
         [columnKey]: nextVisible,
       };
 
-      emitChange({
-        type: "columnVisibility",
-        columnVisibility: nextVisibility,
-        columnKey,
-        visible: nextVisible,
-      });
+      if (controlledMode) {
+        tableState.emitChange({
+          type: "columnVisibility",
+          columnVisibility: nextVisibility,
+          columnKey,
+          visible: nextVisible,
+        });
+      } else {
+        setUncontrolledColumnVisibility(nextVisibility);
+      }
     },
-    [columnVisibility, emitChange, normalizedColumns],
+    [columnVisibility, controlledMode, normalizedColumns, tableState],
   );
-
-  const handleClearSorting = useCallback(() => {
-    emitChange({
-      type: "sorting",
-      sorting: {
-        key: "",
-        direction: "",
-      },
-      reason: "clear",
-    });
-  }, [emitChange]);
 
   const handleExport = useCallback(
     (format) => {
-      emitChange({
+      tableState.emitChange({
         type: "export",
         format,
         context: {
-          filters,
-          sorting: normalizedSorting,
+          filters: effectiveFilters,
+          sorting: effectiveSorting,
           pagination: {
-            page: safePage,
-            pageSize: normalizedPagination.pageSize,
-            total: normalizedPagination.total,
+            page: controlledMode ? tableState.safePage : Math.max(1, toIntegerOrFallback(uncontrolledPage, 1)),
+            pageSize: controlledMode
+              ? tableState.normalizedPagination.pageSize
+              : Math.max(1, toIntegerOrFallback(uncontrolledPageSize, DEFAULT_PAGE_SIZE)),
+            total: controlledMode ? tableState.normalizedPagination.total : rows.length,
           },
           visibleColumnKeys: visibleColumns.map((column) => column.key),
         },
       });
     },
-    [emitChange, filters, normalizedPagination.pageSize, normalizedPagination.total, normalizedSorting, safePage, visibleColumns],
+    [controlledMode, effectiveFilters, effectiveSorting, rows.length, tableState, uncontrolledPage, uncontrolledPageSize, visibleColumns],
   );
 
-  const handleAction = useCallback(
-    ({ action, row }) => {
-      if (batchModeEnabled) {
-        const batchType = resolveBatchTypeFromAction(action);
-        const nextBatchState = resolveNextBatchState(row?.__batchState, batchType);
-        const nextRow = {
-          ...(row || {}),
-          __batchState: nextBatchState,
-        };
+  const batchControlsVisible = batchMode === true;
 
-        onBatchChange({
-          type: batchType,
-          row: nextRow,
-          previousRow: row,
-          action,
-          batchState: nextBatchState,
-          source: "Table",
-        });
-        return;
-      }
+  const handleSaveBatch = useCallback(async () => {
+    if (!batchControlsVisible || !batch.hasPendingChanges || isBatchSubmitting) {
+      return;
+    }
 
-      emitChange({
+    setIsBatchSubmitting(true);
+
+    try {
+      await batch.saveBatch();
+    } finally {
+      setIsBatchSubmitting(false);
+    }
+  }, [batch, batchControlsVisible, isBatchSubmitting]);
+
+  const handleCancelBatch = useCallback(() => {
+    if (!batchControlsVisible || !batch.hasPendingChanges || isBatchSubmitting) {
+      return;
+    }
+
+    batch.cancelBatch();
+  }, [batch, batchControlsVisible, isBatchSubmitting]);
+
+  const batchControls = batchControlsVisible ? (
+    <div className="psb-ui-table-batch-controls">
+      <span className={`small ${batch.hasPendingChanges ? "text-warning-emphasis fw-semibold" : "text-muted"}`}>
+        {batch.hasPendingChanges ? "Unsaved changes" : "No changes"}
+      </span>
+      <div className="psb-ui-table-batch-controls-actions">
+        <button
+          type="button"
+          className="btn btn-primary btn-sm"
+          onClick={handleSaveBatch}
+          disabled={!batch.hasPendingChanges || isBatchSubmitting}
+        >
+          {isBatchSubmitting ? "Saving..." : "Save Batch"}
+        </button>
+        <button
+          type="button"
+          className="btn btn-light btn-sm"
+          onClick={handleCancelBatch}
+          disabled={!batch.hasPendingChanges || isBatchSubmitting}
+        >
+          Cancel Batch
+        </button>
+      </div>
+    </div>
+  ) : null;
+
+  const handleRowAction = useCallback(
+    ({ action, row, rowIndex }) => {
+      tableState.emitChange({
         type: "action",
         action,
         row,
+        rowIndex,
       });
     },
-    [batchModeEnabled, emitChange, onBatchChange],
+    [tableState],
   );
 
-  const sidePanelColumns = useMemo(() => {
-    if (!actionColumnEnabled) {
-      return normalizedColumns;
+  const { handleAction } = useTableActions({
+    batchMode,
+    onBatchChange,
+    batchApi: batch,
+    onRowAction: controlledMode ? handleRowAction : undefined,
+  });
+
+  const drag = useTableDragNDrop({
+    draggable,
+    onReorder,
+    rows,
+    rowIdKey,
+    batchMode,
+    batchApi: batch,
+  });
+
+  const sidePanelColumns = useMemo(
+    () => buildSidePanelColumns({ actionColumnEnabled, normalizedColumns }),
+    [actionColumnEnabled, normalizedColumns],
+  );
+
+  const sortingEnabled = useMemo(
+    () => normalizedColumns.some((column) => column.sortable === true),
+    [normalizedColumns],
+  );
+
+  const tableColSpan = visibleColumns.length + (actionColumnVisible ? 1 : 0);
+
+  const handleUncontrolledSearchDebouncedChange = useCallback(
+    (nextValue) => {
+      if (controlledMode) {
+        tableState.handleSearchDebouncedChange(nextValue);
+        return;
+      }
+
+      const normalized = String(nextValue || "").trim();
+
+      setUncontrolledFilters((previous) => {
+        const next = {
+          ...previous,
+        };
+
+        if (normalized) {
+          next.search = normalized;
+        } else {
+          delete next.search;
+        }
+
+        return next;
+      });
+      setUncontrolledPage(1);
+    },
+    [controlledMode, tableState],
+  );
+
+  const handleFilterValueChange = useCallback(
+    (filterKey, nextValue) => {
+      if (controlledMode) {
+        tableState.handleFilterValueChange(filterKey, nextValue);
+        return;
+      }
+
+      setUncontrolledFilters((previous) => {
+        const next = {
+          ...previous,
+          [filterKey]: nextValue,
+        };
+
+        if (isEmptyFilterValue(nextValue)) {
+          delete next[filterKey];
+        }
+
+        return next;
+      });
+      setUncontrolledPage(1);
+    },
+    [controlledMode, tableState],
+  );
+
+  const handleSortToggle = useCallback(
+    (column) => {
+      if (!column?.sortable) {
+        return;
+      }
+
+      if (controlledMode) {
+        tableState.handleSortToggle(column);
+        return;
+      }
+
+      setUncontrolledSorting((previous) => {
+        const normalized = normalizeSortingState(previous);
+        const nextDirection =
+          normalized.key === column.key
+            ? normalized.direction === "asc"
+              ? "desc"
+              : "asc"
+            : "asc";
+
+        return {
+          key: column.key,
+          direction: nextDirection,
+        };
+      });
+      setUncontrolledPage(1);
+    },
+    [controlledMode, tableState],
+  );
+
+  const handleClearSorting = useCallback(() => {
+    if (controlledMode) {
+      tableState.handleClearSorting();
+      return;
     }
 
-    return [
-      {
-        key: ACTION_COLUMN_VISIBILITY_KEY,
-        label: "Actions",
-        isSystem: true,
-      },
-      ...normalizedColumns,
-    ];
-  }, [actionColumnEnabled, normalizedColumns]);
+    setUncontrolledSorting({ key: "", direction: "" });
+  }, [controlledMode, tableState]);
 
-  const mergedClassName = ["psb-ui-table", "psb-ui-data-table", className].filter(Boolean).join(" ");
+  const effectiveSearchValue = controlledMode
+    ? tableState.searchValue
+    : String(uncontrolledFilters.search || "");
+  const normalizedSearchQuery = String(effectiveSearchValue || "").trim().toLowerCase();
+
+  const filteredRows = useMemo(() => {
+    if (controlledMode) {
+      return rows;
+    }
+
+    return rows.filter((row) => {
+      if (normalizedSearchQuery) {
+        const searchMatch = visibleColumns.some((column) => {
+          const value = getNestedValue(row, column.key);
+          return String(value ?? "").toLowerCase().includes(normalizedSearchQuery);
+        });
+
+        if (!searchMatch) {
+          return false;
+        }
+      }
+
+      for (const filter of tableState.normalizedFilterConfig) {
+        if (!filter?.key || filter.key === "search") {
+          continue;
+        }
+
+        const filterValue = effectiveFilters[filter.key];
+        if (isEmptyFilterValue(filterValue)) {
+          continue;
+        }
+
+        if (!matchesFilter(row, filter, filterValue)) {
+          return false;
+        }
+      }
+
+      return true;
+    });
+  }, [controlledMode, effectiveFilters, normalizedSearchQuery, rows, tableState.normalizedFilterConfig, visibleColumns]);
+
+  const sortedRows = useMemo(() => {
+    if (controlledMode || !effectiveSorting.key) {
+      return filteredRows;
+    }
+
+    const direction = effectiveSorting.direction === "desc" ? -1 : 1;
+
+    return filteredRows.slice().sort((left, right) => {
+      const leftValue = getNestedValue(left, effectiveSorting.key);
+      const rightValue = getNestedValue(right, effectiveSorting.key);
+      return compareSortValues(leftValue, rightValue) * direction;
+    });
+  }, [controlledMode, effectiveSorting, filteredRows]);
+
+  const effectiveTotal = controlledMode ? tableState.normalizedPagination.total : sortedRows.length;
+  const effectivePageSize = controlledMode
+    ? tableState.normalizedPagination.pageSize
+    : Math.max(1, toIntegerOrFallback(uncontrolledPageSize, DEFAULT_PAGE_SIZE));
+  const effectiveTotalPages = controlledMode
+    ? tableState.totalPages
+    : Math.max(1, Math.ceil(effectiveTotal / effectivePageSize));
+  const requestedPage = controlledMode
+    ? tableState.normalizedPagination.page
+    : Math.max(1, toIntegerOrFallback(uncontrolledPage, 1));
+  const safePage = Math.min(Math.max(1, requestedPage), effectiveTotalPages);
+
+  useEffect(() => {
+    if (controlledMode) {
+      return;
+    }
+
+    if (safePage !== requestedPage) {
+      setUncontrolledPage(safePage);
+    }
+  }, [controlledMode, requestedPage, safePage]);
+
+  const displayRows = useMemo(() => {
+    if (controlledMode) {
+      return rows;
+    }
+
+    const start = (safePage - 1) * effectivePageSize;
+    return sortedRows.slice(start, start + effectivePageSize);
+  }, [controlledMode, effectivePageSize, rows, safePage, sortedRows]);
+
+  const normalizedPageSizeOptions = useMemo(
+    () => (controlledMode
+      ? tableState.normalizedPageSizeOptions
+      : normalizePageSizeOptions(pageSizeOptions, effectivePageSize)),
+    [controlledMode, effectivePageSize, pageSizeOptions, tableState.normalizedPageSizeOptions],
+  );
+
+  const pageList = useMemo(
+    () => (controlledMode ? tableState.pageList : buildPageList(safePage, effectiveTotalPages)),
+    [controlledMode, effectiveTotalPages, safePage, tableState.pageList],
+  );
+
+  const firstVisibleIndex = effectiveTotal === 0 ? 0 : (safePage - 1) * effectivePageSize + 1;
+  const lastVisibleIndex = effectiveTotal === 0 ? 0 : Math.min(effectiveTotal, safePage * effectivePageSize);
+
+  const requestPage = useCallback(
+    (nextPage, nextPageSize = effectivePageSize) => {
+      if (controlledMode) {
+        tableState.requestPage(nextPage, nextPageSize);
+        return;
+      }
+
+      const safePageSize = Math.min(500, Math.max(1, toIntegerOrFallback(nextPageSize, effectivePageSize)));
+      const boundedPage = Math.max(1, toIntegerOrFallback(nextPage, 1));
+
+      setUncontrolledPageSize(safePageSize);
+      setUncontrolledPage(boundedPage);
+    },
+    [controlledMode, effectivePageSize, tableState],
+  );
+
+  const handlePageSizeChange = useCallback(
+    (event) => {
+      const nextPageSize = Math.min(500, Math.max(1, toIntegerOrFallback(event.target.value, effectivePageSize)));
+      requestPage(1, nextPageSize);
+    },
+    [effectivePageSize, requestPage],
+  );
+
+  const hasLocalFilters = useMemo(
+    () => Object.entries(effectiveFilters).some(([key, value]) => key !== "search" && !isEmptyFilterValue(value)),
+    [effectiveFilters],
+  );
+
+  const hasFilterControls = tableState.normalizedFilterConfig.length > 0;
+  const localTransformsDisableDrag = !controlledMode
+    && (normalizedSearchQuery !== "" || hasLocalFilters || effectiveSorting.key !== "" || displayRows.length !== rows.length);
+
+  const renderCellContext = useCallback(
+    ({ rowIndex, column }) => (controlledMode ? { rowIndex, column } : rowIndex),
+    [controlledMode],
+  );
+
+  const tableBody = loading
+    ? (
+      <tbody>
+        <tr>
+          <td className="psb-ui-table-loading" colSpan={tableColSpan}>
+            <span className="d-inline-flex align-items-center gap-2">
+              <Spinner size="sm" animation="border" role="status" />
+              <span>{loadingMessage}</span>
+            </span>
+          </td>
+        </tr>
+      </tbody>
+    )
+    : renderTableBody({
+      rows: displayRows,
+      rowIdKey,
+      columns: visibleColumns,
+      actionColumnVisible,
+      actions,
+      draggable: drag.canDrag && !localTransformsDisableDrag,
+      rowIds: drag.rowIds,
+      selectedRowId,
+      onRowClick,
+      onAction: handleAction,
+      emptyMessage,
+      emptyColSpan: tableColSpan,
+      renderCellContext,
+      emptyValue: controlledMode ? "-" : "--",
+      striped: !controlledMode,
+    });
+
+  const tableMarkup = (
+    <BootstrapTable
+      bordered
+      hover
+      className={tableClassName}
+      style={controlledMode ? undefined : { width: "100%", tableLayout: "fixed" }}
+    >
+      <colgroup>
+        {actionColumnVisible ? (
+          <col
+            className="psb-ui-table-actions-col"
+            style={{
+              width: `${ACTION_COLUMN_WIDTH}px`,
+              minWidth: `${ACTION_COLUMN_WIDTH}px`,
+            }}
+          />
+        ) : null}
+        {visibleColumns.map((column) => (
+          <col
+            key={column.key}
+            style={{
+              width: `${getColumnWidth(column)}px`,
+              minWidth: `${column.minWidth}px`,
+            }}
+          />
+        ))}
+      </colgroup>
+
+      <thead onContextMenu={(event) => handleHeaderContextMenu(event, null)}>
+        <tr>
+          {actionColumnVisible ? (
+            <th
+              scope="col"
+              className="psb-ui-table-actions-header"
+              onContextMenu={(event) => handleHeaderContextMenu(event, null)}
+            >
+              <span className="psb-ui-table-header-label">Actions</span>
+            </th>
+          ) : null}
+
+          {visibleColumns.map((column) => {
+            const isSortedColumn = effectiveSorting.key === column.key;
+            const sortIcon =
+              !isSortedColumn
+                ? "bi-arrow-down-up"
+                : effectiveSorting.direction === "asc"
+                  ? "bi-sort-up"
+                  : "bi-sort-down";
+
+            return (
+              <th
+                key={column.key}
+                scope="col"
+                style={{
+                  width: `${getColumnWidth(column)}px`,
+                  minWidth: `${column.minWidth}px`,
+                  textAlign: column?.align || "left",
+                  verticalAlign: "middle",
+                }}
+                className={column.resizable ? "psb-ui-table-th-resizable" : ""}
+                onContextMenu={(event) => handleHeaderContextMenu(event, column)}
+              >
+                <div className="psb-ui-table-th-content">
+                  {column.sortable ? (
+                    <button
+                      type="button"
+                      className="psb-ui-table-sort-btn"
+                      onClick={() => handleSortToggle(column)}
+                      onContextMenu={(event) => handleHeaderContextMenu(event, column)}
+                      aria-label={`Sort by ${column.label}`}
+                    >
+                      <span>{column.label}</span>
+                      <i className={`bi ${sortIcon}`} aria-hidden="true" />
+                    </button>
+                  ) : (
+                    <span className="psb-ui-table-header-label" onContextMenu={(event) => handleHeaderContextMenu(event, column)}>
+                      {column.label}
+                    </span>
+                  )}
+
+                  {column.resizable ? (
+                    <span
+                      className={[
+                        "psb-ui-table-resizer",
+                        activeResizeColumnKey === column.key ? "is-active" : "",
+                      ].filter(Boolean).join(" ")}
+                      onMouseDown={(event) => startResize(event, column)}
+                      role="presentation"
+                    />
+                  ) : null}
+                </div>
+              </th>
+            );
+          })}
+        </tr>
+      </thead>
+
+      {tableBody}
+    </BootstrapTable>
+  );
+
+  const hasRows = displayRows.length > 0;
+  const tableWithDrag = drag.wrapWithDragContext(tableMarkup, hasRows && !localTransformsDisableDrag);
+
+  const searchShell = (
+    <div className="psb-ui-table-search-shell">
+      <Form.Label className="psb-ui-table-filter-label" htmlFor={searchInputId}>
+        Search
+      </Form.Label>
+      <SearchBar
+        id={searchInputId}
+        value={effectiveSearchValue}
+        debounceMs={Math.max(0, toIntegerOrFallback(searchDebounceMs, DEFAULT_SEARCH_DEBOUNCE_MS))}
+        className="psb-ui-table-search-input"
+        placeholder={searchPlaceholder}
+        onDebouncedChange={handleUncontrolledSearchDebouncedChange}
+      />
+    </div>
+  );
 
   return (
-    <section className="psb-ui-table-shell" aria-label="Data table">
-      <div className="psb-ui-table-filters-shell">
-        <button
-          type="button"
-          className="psb-ui-table-filters-toggle"
-          aria-expanded={filtersExpanded}
-          onClick={() => setFiltersExpanded((current) => !current)}
-        >
-          <span>Filters</span>
-          <i className={`bi ${filtersExpanded ? "bi-chevron-up" : "bi-chevron-down"}`} aria-hidden="true" />
-        </button>
+    <section className={["psb-ui-table-shell", className].filter(Boolean).join(" ")} aria-label="Data table">
+      {batchControls}
+      {hasFilterControls ? (
+        <div className="psb-ui-table-filters-shell">
+          <button
+            type="button"
+            className="psb-ui-table-filters-toggle"
+            aria-expanded={filtersExpanded}
+            onClick={() => setFiltersExpanded((current) => !current)}
+          >
+            <span>Filters</span>
+            <i className={`bi ${filtersExpanded ? "bi-chevron-up" : "bi-chevron-down"}`} aria-hidden="true" />
+          </button>
 
-        {filtersExpanded ? (
-          <div className="psb-ui-table-filters" role="group" aria-label="Table filters">
-            {normalizedFilterConfig.map((filter) => {
-              const filterId = `${tableId}-filter-${filter.key}`;
-              const filterValue = filters[filter.key];
+          {filtersExpanded ? (
+            <div className="psb-ui-table-filters" role="group" aria-label="Table filters">
+              {tableState.normalizedFilterConfig.map((filter) => {
+                const filterId = `${tableId}-filter-${filter.key}`;
+                const filterValue = effectiveFilters[filter.key];
 
-              if (filter.type === TABLE_FILTER_TYPES.SELECT) {
-                const options = normalizeFilterOptions(filter.options);
-                const selectedValue = filterValue === undefined || filterValue === null ? "" : String(filterValue);
+                if (filter.type === TABLE_FILTER_TYPES.SELECT) {
+                  const options = normalizeFilterOptions(filter.options);
+                  const selectedValue = filterValue === undefined || filterValue === null ? "" : String(filterValue);
 
-                return (
-                  <div key={filter.key} className="psb-ui-table-filter">
-                    <Form.Label className="psb-ui-table-filter-label" htmlFor={filterId}>
-                      {filter.label}
-                    </Form.Label>
-                    <Form.Select
-                      id={filterId}
-                      value={selectedValue}
-                      disabled={filter.loading === true}
-                      onChange={(event) => handleFilterValueChange(filter.key, event.target.value)}
-                    >
-                      <option value="">All</option>
-                      {options.map((option, index) => (
-                        <option key={`${filter.key}-${index}`} value={String(option.value ?? "")}>
-                          {option.label}
-                        </option>
-                      ))}
-                    </Form.Select>
-                  </div>
-                );
-              }
+                  return (
+                    <div key={filter.key} className="psb-ui-table-filter">
+                      <Form.Label className="psb-ui-table-filter-label" htmlFor={filterId}>
+                        {filter.label}
+                      </Form.Label>
+                      <Form.Select
+                        id={filterId}
+                        value={selectedValue}
+                        disabled={filter.loading === true}
+                        onChange={(event) => handleFilterValueChange(filter.key, event.target.value)}
+                      >
+                        <option value="">All</option>
+                        {options.map((option, index) => (
+                          <option key={`${filter.key}-${index}`} value={String(option.value ?? "")}>
+                            {option.label}
+                          </option>
+                        ))}
+                      </Form.Select>
+                    </div>
+                  );
+                }
 
-              if (filter.type === TABLE_FILTER_TYPES.DATE) {
+                if (filter.type === TABLE_FILTER_TYPES.DATE) {
+                  return (
+                    <div key={filter.key} className="psb-ui-table-filter">
+                      <Form.Label className="psb-ui-table-filter-label" htmlFor={filterId}>
+                        {filter.label}
+                      </Form.Label>
+                      <Form.Control
+                        id={filterId}
+                        type="date"
+                        value={String(filterValue || "")}
+                        onChange={(event) => handleFilterValueChange(filter.key, event.target.value)}
+                      />
+                    </div>
+                  );
+                }
+
+                if (filter.type === TABLE_FILTER_TYPES.DATERANGE) {
+                  const dateRange = getDateRangeValue(filterValue);
+
+                  return (
+                    <div key={filter.key} className="psb-ui-table-filter psb-ui-table-filter-range">
+                      <Form.Label className="psb-ui-table-filter-label" htmlFor={`${filterId}-start`}>
+                        {filter.label}
+                      </Form.Label>
+                      <div className="psb-ui-table-range-inputs">
+                        <Form.Control
+                          id={`${filterId}-start`}
+                          type="date"
+                          value={dateRange.start}
+                          onChange={(event) =>
+                            handleFilterValueChange(filter.key, {
+                              start: event.target.value,
+                              end: dateRange.end,
+                            })
+                          }
+                        />
+                        <Form.Control
+                          id={`${filterId}-end`}
+                          type="date"
+                          value={dateRange.end}
+                          onChange={(event) =>
+                            handleFilterValueChange(filter.key, {
+                              start: dateRange.start,
+                              end: event.target.value,
+                            })
+                          }
+                        />
+                      </div>
+                    </div>
+                  );
+                }
+
                 return (
                   <div key={filter.key} className="psb-ui-table-filter">
                     <Form.Label className="psb-ui-table-filter-label" htmlFor={filterId}>
@@ -804,219 +1074,27 @@ export default function Table({
                     </Form.Label>
                     <Form.Control
                       id={filterId}
-                      type="date"
+                      type="text"
                       value={String(filterValue || "")}
                       onChange={(event) => handleFilterValueChange(filter.key, event.target.value)}
                     />
                   </div>
                 );
-              }
-
-              if (filter.type === TABLE_FILTER_TYPES.DATERANGE) {
-                const dateRange = getDateRangeValue(filterValue);
-
-                return (
-                  <div key={filter.key} className="psb-ui-table-filter psb-ui-table-filter-range">
-                    <Form.Label className="psb-ui-table-filter-label" htmlFor={`${filterId}-start`}>
-                      {filter.label}
-                    </Form.Label>
-                    <div className="psb-ui-table-range-inputs">
-                      <Form.Control
-                        id={`${filterId}-start`}
-                        type="date"
-                        value={dateRange.start}
-                        onChange={(event) =>
-                          handleFilterValueChange(filter.key, {
-                            start: event.target.value,
-                            end: dateRange.end,
-                          })
-                        }
-                      />
-                      <Form.Control
-                        id={`${filterId}-end`}
-                        type="date"
-                        value={dateRange.end}
-                        onChange={(event) =>
-                          handleFilterValueChange(filter.key, {
-                            start: dateRange.start,
-                            end: event.target.value,
-                          })
-                        }
-                      />
-                    </div>
-                  </div>
-                );
-              }
-
-              return (
-                <div key={filter.key} className="psb-ui-table-filter">
-                  <Form.Label className="psb-ui-table-filter-label" htmlFor={filterId}>
-                    {filter.label}
-                  </Form.Label>
-                  <Form.Control
-                    id={filterId}
-                    type="text"
-                    value={String(filterValue || "")}
-                    onChange={(event) => handleFilterValueChange(filter.key, event.target.value)}
-                  />
-                </div>
-              );
-            })}
-          </div>
-        ) : null}
-      </div>
-
-      <div className="psb-ui-table-search-shell">
-        <Form.Label className="psb-ui-table-filter-label" htmlFor={searchInputId}>
-          Search
-        </Form.Label>
-        <SearchBar
-          id={searchInputId}
-          value={searchValue}
-          debounceMs={Math.max(0, toIntegerOrFallback(searchDebounceMs, DEFAULT_SEARCH_DEBOUNCE_MS))}
-          className="psb-ui-table-search-input"
-          placeholder={searchPlaceholder}
-          onDebouncedChange={handleSearchDebouncedChange}
-        />
-      </div>
-
-      <div className="table-responsive">
-        <BootstrapTable bordered hover className={mergedClassName}>
-          <colgroup>
-            {actionColumnVisible ? (
-              <col
-                style={{
-                  width: `${ACTION_COLUMN_WIDTH}px`,
-                  minWidth: `${ACTION_COLUMN_WIDTH}px`,
-                }}
-              />
-            ) : null}
-            {visibleColumns.map((column) => (
-              <col
-                key={column.key}
-                style={{
-                  width: `${getColumnWidth(column)}px`,
-                  minWidth: `${column.minWidth}px`,
-                }}
-              />
-            ))}
-          </colgroup>
-
-          <thead onContextMenu={handleHeaderContextMenu}>
-            <tr>
-              {actionColumnVisible ? (
-                <th scope="col" className="psb-ui-table-actions-header" onContextMenu={handleHeaderContextMenu}>
-                  Actions
-                </th>
-              ) : null}
-
-              {visibleColumns.map((column) => {
-                const isSortedColumn = normalizedSorting.key === column.key;
-                const sortIcon =
-                  !isSortedColumn
-                    ? "bi-arrow-down-up"
-                    : normalizedSorting.direction === "asc"
-                      ? "bi-sort-up"
-                      : "bi-sort-down";
-
-                return (
-                  <th
-                    key={column.key}
-                    scope="col"
-                    style={{
-                      width: `${getColumnWidth(column)}px`,
-                      minWidth: `${column.minWidth}px`,
-                    }}
-                    className={column.resizable ? "psb-ui-table-th-resizable" : ""}
-                    onContextMenu={handleHeaderContextMenu}
-                  >
-                    <div className="psb-ui-table-th-content">
-                      {column.sortable ? (
-                        <button
-                          type="button"
-                          className="psb-ui-table-sort-btn"
-                          onClick={() => handleSortToggle(column)}
-                          onContextMenu={handleHeaderContextMenu}
-                          aria-label={`Sort by ${column.label}`}
-                        >
-                          <span>{column.label}</span>
-                          <i className={`bi ${sortIcon}`} aria-hidden="true" />
-                        </button>
-                      ) : (
-                        <span className="psb-ui-table-header-label" onContextMenu={handleHeaderContextMenu}>{column.label}</span>
-                      )}
-
-                      {column.resizable ? (
-                        <span
-                          className={["psb-ui-table-resizer", activeResizeColumnKey === column.key ? "is-active" : ""]
-                            .filter(Boolean)
-                            .join(" ")}
-                          onMouseDown={(event) => startResize(event, column)}
-                          role="presentation"
-                        />
-                      ) : null}
-                    </div>
-                  </th>
-                );
               })}
-            </tr>
-          </thead>
+            </div>
+          ) : null}
+        </div>
+      ) : null}
 
-          <tbody>
-            {loading ? (
-              <tr>
-                <td className="psb-ui-table-loading" colSpan={tableColSpan}>
-                  <span className="d-inline-flex align-items-center gap-2">
-                    <Spinner size="sm" animation="border" role="status" />
-                    <span>{loadingMessage}</span>
-                  </span>
-                </td>
-              </tr>
-            ) : data.length === 0 ? (
-              <tr>
-                <td className="psb-ui-table-empty" colSpan={tableColSpan}>
-                  {emptyMessage}
-                </td>
-              </tr>
-            ) : (
-              data.map((row, rowIndex) => (
-                <tr key={String(row?.id || rowIndex)} className={resolveBatchClassName(row?.__batchState) || undefined}>
-                  {actionColumnVisible ? (
-                    <td className="psb-ui-table-actions-cell">
-                      <ActionColumn row={row} actions={actions} onAction={handleAction} />
-                    </td>
-                  ) : null}
+      {searchShell}
 
-                  {visibleColumns.map((column) => {
-                    const rawValue = getNestedValue(row, column.key);
-                    const renderedValue =
-                      typeof column.render === "function"
-                        ? column.render(row, rawValue, {
-                            rowIndex,
-                            column,
-                          })
-                        : rawValue;
-
-                    return (
-                      <td key={`${rowIndex}-${column.key}`}>
-                        {renderedValue === undefined || renderedValue === null || renderedValue === ""
-                          ? "-"
-                          : renderedValue}
-                      </td>
-                    );
-                  })}
-                </tr>
-              ))
-            )}
-          </tbody>
-        </BootstrapTable>
-      </div>
+      <div className="table-responsive">{tableWithDrag}</div>
 
       <div className="psb-ui-table-pagination">
         <div className="psb-ui-table-pagination-summary">
-          {normalizedPagination.total === 0
+          {effectiveTotal === 0
             ? "No records"
-            : `Showing ${firstVisibleIndex}-${lastVisibleIndex} of ${normalizedPagination.total}`}
+            : `Showing ${firstVisibleIndex}-${lastVisibleIndex} of ${effectiveTotal}`}
         </div>
 
         <div className="psb-ui-table-pagination-controls">
@@ -1028,7 +1106,7 @@ export default function Table({
               id={`${tableId}-page-size`}
               className="psb-ui-table-page-size-select"
               size="sm"
-              value={String(normalizedPagination.pageSize)}
+              value={String(effectivePageSize)}
               onChange={handlePageSizeChange}
             >
               {normalizedPageSizeOptions.map((option) => (
@@ -1039,9 +1117,14 @@ export default function Table({
             </Form.Select>
           </div>
 
-          <Button size="sm" variant="secondary" disabled={safePage <= 1} onClick={() => requestPage(safePage - 1)}>
+          <button
+            type="button"
+            className="btn btn-secondary btn-sm"
+            disabled={safePage <= 1}
+            onClick={() => requestPage(safePage - 1)}
+          >
             Prev
-          </Button>
+          </button>
 
           <div className="psb-ui-table-page-list" aria-label="Pagination">
             {pageList.map((entry, index) =>
@@ -1053,9 +1136,10 @@ export default function Table({
                 <button
                   key={`page-${entry}`}
                   type="button"
-                  className={["psb-ui-table-page-btn", entry === safePage ? "is-active" : ""]
-                    .filter(Boolean)
-                    .join(" ")}
+                  className={[
+                    "psb-ui-table-page-btn",
+                    entry === safePage ? "is-active" : "",
+                  ].filter(Boolean).join(" ")}
                   onClick={() => requestPage(Number(entry))}
                 >
                   {entry}
@@ -1064,29 +1148,32 @@ export default function Table({
             )}
           </div>
 
-          <Button
-            size="sm"
-            variant="secondary"
-            disabled={safePage >= totalPages}
+          <button
+            type="button"
+            className="btn btn-secondary btn-sm"
+            disabled={safePage >= effectiveTotalPages}
             onClick={() => requestPage(safePage + 1)}
           >
             Next
-          </Button>
+          </button>
         </div>
       </div>
 
-      <TableContextMenu
+      <TableContextMenuWrapper
         open={contextMenuState.open}
         position={{ x: contextMenuState.x, y: contextMenuState.y }}
-        onCustomize={handleOpenCustomization}
+        sorting={effectiveSorting}
+        sortingEnabled={sortingEnabled}
+        onCustomize={() => setSidePanelOpen(true)}
+        onClearSorting={handleClearSorting}
         onClose={closeContextMenu}
       />
 
-      <TableSidePanel
+      <TableSidePanelWrapper
         open={sidePanelOpen}
         columns={sidePanelColumns}
         columnVisibility={columnVisibility}
-        sorting={normalizedSorting}
+        sorting={effectiveSorting}
         exportFormats={exportFormats}
         onToggleColumn={handleToggleColumnVisibility}
         onClearSorting={handleClearSorting}

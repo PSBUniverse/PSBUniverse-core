@@ -330,7 +330,7 @@ const loadData = async (query) => {
 <SearchBar
   value={search}
   debounceMs={350}
-  placeholder="Search records�"
+  placeholder="Search records..."
   onDebouncedChange={(next) => {
     setSearch(next);
     if (next) loadData(next);
@@ -1416,7 +1416,7 @@ function PlaygroundTab() {
     columnVisibility: {},
     columnSizing: {},
   });
-  const [lastEvent,      setLastEvent]      = useState({ type: "�" });
+  const [lastEvent,      setLastEvent]      = useState({ type: "unknown" });
   const [showTableLog,   setShowTableLog]   = useState(false);
   const [workflowKey,    setWorkflowKey]    = useState("");
   const [pendingWorkflowAction, setPendingWorkflowAction] = useState(null);
@@ -1511,7 +1511,7 @@ function PlaygroundTab() {
   }), [tableState, page, pageSize, total]);
 
   const handleTableChange = useCallback((event) => {
-    setLastEvent(event || { type: "�" });
+    setLastEvent(event || { type: "unknown" });
     const t = String(event?.type || "").toLowerCase();
     if (t === "search") {
       const v = String(event.value || "").trim();
@@ -1638,7 +1638,7 @@ function PlaygroundTab() {
           <SearchBar
             value={searchValue}
             debounceMs={300}
-            placeholder="Search with debounce�"
+            placeholder="Search with debounce..."
             onDebouncedChange={(v) => {
               setSearchValue(v);
               if (v) toastInfo(`Searching: ${v}`, "Search");
@@ -1673,7 +1673,7 @@ function PlaygroundTab() {
               ))}
             </Dropdown.Menu>
           </Dropdown>
-          <p style={{ fontSize: 12, color: "#666", marginTop: 8 }}>Selected: <code>{dropdownValue?.label || "�"}</code></p>
+          <p style={{ fontSize: 12, color: "#666", marginTop: 8 }}>Selected: <code>{dropdownValue?.label || "None"}</code></p>
         </div>
       ),
     },
@@ -1840,7 +1840,7 @@ function BonusWorkflowModal() {
     <div className={styles.playBody}>
       <p className={styles.playLabel}>
         Critical workflow actions USE shared modal confirmation instead of browser-native prompts.
-        Developers remain free to define what happens on click � this is just a pattern example.
+        Developers remain free to define what happens on click - this is just a pattern example.
       </p>
       <div className={styles.toolbarRow}>
         {BONUS_WORKFLOW_ACTIONS.map((a) => (
@@ -1975,7 +1975,7 @@ function BonusRealWorldTable() {
         actions={actions}
         loading={false}
         pageSizeOptions={[5, 10]}
-        searchPlaceholder="Search employees�"
+        searchPlaceholder="Search employees..."
         onChange={handleTableChange}
       />
       <Modal
@@ -2196,7 +2196,7 @@ function ModalRefContent() {
         <RefPropRow prop="show"   required type="boolean"    desc="Controls visibility." />
         <RefPropRow prop="onHide" required type="function"   desc="Called on backdrop/close click." />
         <RefPropRow prop="title"  required type="string"     desc="Header text." />
-        <RefPropRow prop="footer"          type="ReactNode"  desc="Footer slot � put Cancel + Save here." />
+        <RefPropRow prop="footer"          type="ReactNode"  desc="Footer slot - put Cancel + Save here." />
       </div>
       <PatternToggle
         modes={[

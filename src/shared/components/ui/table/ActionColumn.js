@@ -11,6 +11,20 @@ const ACTION_TYPE_ORDER = Object.freeze({
   danger: 3,
 });
 
+const ACTION_MENU_POPPER_CONFIG = Object.freeze({
+  strategy: "fixed",
+  modifiers: [
+    {
+      name: "preventOverflow",
+      options: {
+        boundary: "viewport",
+        altBoundary: true,
+        padding: 8,
+      },
+    },
+  ],
+});
+
 function normalizeActionType(value) {
   const raw = String(value || "secondary").trim().toLowerCase();
 
@@ -188,7 +202,7 @@ export default function ActionColumn({ row, actions = [], onAction }) {
           <i className="bi bi-three-dots-vertical" aria-hidden="true" />
         </Dropdown.Toggle>
 
-        <Dropdown.Menu>
+        <Dropdown.Menu popperConfig={ACTION_MENU_POPPER_CONFIG}>
           {nonDangerActions.map((action) => {
             const iconClassName = resolveIconClassName(action.icon);
 

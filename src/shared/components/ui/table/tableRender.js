@@ -1,0 +1,314 @@
+import { SortableContext, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
+import Button from "@/shared/components/ui/controls/Button";
+import ActionColumn from "@/shared/components/ui/table/ActionColumn";
+import { getNestedValue, resolveBatchClassName, toRowId } from "@/shared/components/ui/table/tableUtils";
+
+function resolveCellStyle(column) {
+  return {
+    width: column?.width,
+    textAlign: column?.align || "left",
+    verticalAlign: "middle",
+    wordBreak: "break-word",
+  };
+}
+
+function renderFallbackValue(value, emptyValue) {
+  return value === undefined || value === null || value === "" ? emptyValue : value;
+}
+
+function ActionCell({
+  row,
+  rowIndex,
+  draggable,
+  dragHandleProps,
+  actions,
+  onAction,
+}) {
+  return (
+    <td
+      className="psb-ui-table-actions-cell"
+      onClick={(event) => {
+        event.stopPropagation();
+      }}
+    >
+      {draggable ? (
+        <div className="d-flex align-items-center justify-content-center gap-1">
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className="px-2 psb-setup-action-btn psb-setup-action-drag"
+            aria-label="Drag row to reorder"
+            title="Drag row to reorder"
+            onClick={(event) => {
+              event.preventDefault();
+              event.stopPropagation();
+            }}
+            {...dragHandleProps}
+          >
+            <i className="bi bi-grip-vertical" aria-hidden="true" />
+          </Button>
+          <ActionColumn
+            row={row}
+            actions={actions}
+            onAction={({ action, row: actionRow }) =>
+              onAction?.({
+                action,
+                row: actionRow || row,
+                rowIndex,
+              })
+            }
+          />
+        </div>
+      ) : (
+        <ActionColumn
+          row={row}
+          actions={actions}
+          onAction={({ action, row: actionRow }) =>
+            onAction?.({
+              action,
+              row: actionRow || row,
+              rowIndex,
+            })
+          }
+        />
+      )}
+    </td>
+  );
+}
+
+function DataRowCells({
+  row,
+  rowId,
+  rowIndex,
+  columns,
+  renderCellContext,
+  emptyValue,
+}) {
+  return columns.map((column) => {
+    const rawValue = getNestedValue(row, column.key);
+    const rendered =
+      typeof column.render === "function"
+        ? column.render(row, rawValue, renderCellContext({ row, rowIndex, column }))
+        : renderFallbackValue(rawValue, emptyValue);
+
+    return (
+      <td key={`${rowId}-${column.key}`} style={resolveCellStyle(column)}>
+        {rendered}
+      </td>
+    );
+  });
+}
+
+function SortableBodyRow({
+  row,
+  rowIndex,
+  rowId,
+  columns,
+  actionColumnVisible,
+  rowClickable,
+  selectedRowId,
+  rowIdKey,
+  onRowClick,
+  actions,
+  onAction,
+  renderCellContext,
+  emptyValue,
+  striped,
+}) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: rowId });
+  const isSelected = String(selectedRowId ?? "") === String(row?.[rowIdKey] ?? "");
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    backgroundColor: isSelected ? "#eef4ff" : undefined,
+    opacity: isDragging ? 0.85 : 1,
+    cursor: rowClickable ? "pointer" : "default",
+  };
+
+  const rowClassName = [
+    "psb-setup-row",
+    striped && rowIndex % 2 === 1 ? "table-light" : "",
+    resolveBatchClassName(row?.__batchState),
+    isSelected ? "psb-setup-row-selected" : "",
+  ].filter(Boolean).join(" ");
+
+  return (
+    <tr
+      ref={setNodeRef}
+      style={style}
+      className={rowClassName}
+      onClick={rowClickable ? () => onRowClick(row) : undefined}
+    >
+      {actionColumnVisible ? (
+        <ActionCell
+          row={row}
+          rowIndex={rowIndex}
+          draggable
+          dragHandleProps={{ ...attributes, ...listeners }}
+          actions={actions}
+          onAction={onAction}
+        />
+      ) : null}
+      <DataRowCells
+        row={row}
+        rowId={rowId}
+        rowIndex={rowIndex}
+        columns={columns}
+        renderCellContext={renderCellContext}
+        emptyValue={emptyValue}
+      />
+    </tr>
+  );
+}
+
+function StaticBodyRow({
+  row,
+  rowIndex,
+  rowId,
+  columns,
+  actionColumnVisible,
+  rowClickable,
+  selectedRowId,
+  rowIdKey,
+  onRowClick,
+  actions,
+  onAction,
+  renderCellContext,
+  emptyValue,
+  striped,
+}) {
+  const isSelected = String(selectedRowId ?? "") === String(row?.[rowIdKey] ?? "");
+
+  const rowClassName = [
+    "psb-setup-row",
+    striped && rowIndex % 2 === 1 ? "table-light" : "",
+    resolveBatchClassName(row?.__batchState),
+    isSelected ? "psb-setup-row-selected" : "",
+  ].filter(Boolean).join(" ");
+
+  return (
+    <tr
+      style={{
+        backgroundColor: isSelected ? "#eef4ff" : undefined,
+        cursor: rowClickable ? "pointer" : "default",
+      }}
+      className={rowClassName}
+      onClick={rowClickable ? () => onRowClick(row) : undefined}
+    >
+      {actionColumnVisible ? (
+        <ActionCell
+          row={row}
+          rowIndex={rowIndex}
+          draggable={false}
+          actions={actions}
+          onAction={onAction}
+        />
+      ) : null}
+      <DataRowCells
+        row={row}
+        rowId={rowId}
+        rowIndex={rowIndex}
+        columns={columns}
+        renderCellContext={renderCellContext}
+        emptyValue={emptyValue}
+      />
+    </tr>
+  );
+}
+
+export function renderTableBody({
+  rows,
+  rowIdKey,
+  columns,
+  actionColumnVisible,
+  actions,
+  draggable,
+  rowIds,
+  selectedRowId,
+  onRowClick,
+  onAction,
+  emptyMessage,
+  emptyColSpan,
+  renderCellContext,
+  emptyValue,
+  striped = false,
+}) {
+  const normalizedRows = Array.isArray(rows) ? rows : [];
+  const hasRows = normalizedRows.length > 0;
+  const rowClickable = typeof onRowClick === "function";
+
+  if (!hasRows) {
+    return (
+      <tbody>
+        <tr>
+          <td colSpan={emptyColSpan} className="text-muted text-center py-3">
+            {emptyMessage}
+          </td>
+        </tr>
+      </tbody>
+    );
+  }
+
+  if (draggable) {
+    return (
+      <SortableContext items={rowIds} strategy={verticalListSortingStrategy}>
+        <tbody>
+          {normalizedRows.map((row, rowIndex) => {
+            const rowId = toRowId(row, rowIdKey, rowIndex);
+
+            return (
+              <SortableBodyRow
+                key={rowId}
+                row={row}
+                rowIndex={rowIndex}
+                rowId={rowId}
+                columns={columns}
+                actionColumnVisible={actionColumnVisible}
+                rowClickable={rowClickable}
+                selectedRowId={selectedRowId}
+                rowIdKey={rowIdKey}
+                onRowClick={onRowClick}
+                actions={actions}
+                onAction={onAction}
+                renderCellContext={renderCellContext}
+                emptyValue={emptyValue}
+                striped={striped}
+              />
+            );
+          })}
+        </tbody>
+      </SortableContext>
+    );
+  }
+
+  return (
+    <tbody>
+      {normalizedRows.map((row, rowIndex) => {
+        const rowId = toRowId(row, rowIdKey, rowIndex);
+
+        return (
+          <StaticBodyRow
+            key={rowId}
+            row={row}
+            rowIndex={rowIndex}
+            rowId={rowId}
+            columns={columns}
+            actionColumnVisible={actionColumnVisible}
+            rowClickable={rowClickable}
+            selectedRowId={selectedRowId}
+            rowIdKey={rowIdKey}
+            onRowClick={onRowClick}
+            actions={actions}
+            onAction={onAction}
+            renderCellContext={renderCellContext}
+            emptyValue={emptyValue}
+            striped={striped}
+          />
+        );
+      })}
+    </tbody>
+  );
+}

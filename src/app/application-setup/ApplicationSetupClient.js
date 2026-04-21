@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { Badge, Button, Card, Input, Modal, SetupTable, toastError, toastSuccess } from "@/shared/components/ui";
+import { Badge, Button, Card, Input, Modal, Table, toastError, toastSuccess } from "@/shared/components/ui";
 import {
   getApplicationDescription,
   getApplicationDisplayName,
@@ -1236,6 +1236,7 @@ export default function ApplicationSetupClient({
         key: "app_name",
         label: "Application Name",
         width: "30%",
+        sortable: true,
         render: (row) => {
           const batchState = String(row?.__batchState || "");
           const markerText =
@@ -1265,17 +1266,20 @@ export default function ApplicationSetupClient({
         key: "app_order",
         label: "Order",
         width: "10%",
+        sortable: true,
         align: "center",
       },
       {
         key: "app_desc",
         label: "Description",
         width: "38%",
+        sortable: true,
       },
       {
         key: "is_active_bool",
         label: "Active",
         width: "12%",
+        sortable: true,
         align: "center",
         render: (row) => <StatusBadge isActive={Boolean(row?.is_active_bool)} />,
       },
@@ -1289,6 +1293,7 @@ export default function ApplicationSetupClient({
         key: "role_name",
         label: "Role Name",
         width: "30%",
+        sortable: true,
         render: (row) => {
           const batchState = String(row?.__batchState || "");
           const markerText =
@@ -1314,11 +1319,13 @@ export default function ApplicationSetupClient({
         key: "role_desc",
         label: "Description",
         width: "44%",
+        sortable: true,
       },
       {
         key: "is_active_bool",
         label: "Active",
         width: "16%",
+        sortable: true,
         align: "center",
         render: (row) => <StatusBadge isActive={Boolean(row?.is_active_bool)} />,
       },
@@ -1541,9 +1548,9 @@ export default function ApplicationSetupClient({
       <div className="row g-3 align-items-start">
         <div className="col-12 col-xl-6">
           <Card title="Applications" subtitle="Drag the grip icon in Actions to reorder applications.">
-            <SetupTable
+            <Table
               columns={applicationColumns}
-              rows={decoratedApplications}
+              data={decoratedApplications}
               rowIdKey="app_id"
               selectedRowId={selectedApp?.app_id ?? null}
               onRowClick={handleApplicationRowClick}
@@ -1561,9 +1568,9 @@ export default function ApplicationSetupClient({
             subtitle={selectedApp ? "Application-scoped roles" : "Click an application row to view its roles."}
           >
             {selectedApp ? (
-              <SetupTable
+              <Table
                 columns={roleColumns}
-                rows={decoratedSelectedAppRoles}
+                data={decoratedSelectedAppRoles}
                 rowIdKey="role_id"
                 actions={roleActions}
                 emptyMessage="No roles assigned to this application."

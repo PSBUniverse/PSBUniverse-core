@@ -7,7 +7,7 @@ import {
   Card,
   Input,
   Modal,
-  SetupTable,
+  Table,
   toastError,
   toastInfo,
   toastSuccess,
@@ -440,13 +440,6 @@ export function UserMasterSetupPanel({ users = [], totalUsers = 0 }) {
   const [isStaging, setIsStaging] = useState(false);
   const [isDeactivatingUser, setIsDeactivatingUser] = useState(false);
 
-  const [userHeaderMenuState, setUserHeaderMenuState] = useState({
-    open: false,
-    x: 0,
-    y: 0,
-  });
-  const [userColumnVisibility, setUserColumnVisibility] = useState({});
-
   const [panelOpen, setPanelOpen] = useState(false);
   const [panelMode, setPanelMode] = useState("view");
   const [panelUserId, setPanelUserId] = useState(null);
@@ -575,15 +568,17 @@ export function UserMasterSetupPanel({ users = [], totalUsers = 0 }) {
 
   const userColumns = useMemo(
     () => [
-      { key: "username", label: "Username", width: "16%" },
-      { key: "full_name", label: "Full Name", width: "22%" },
-      { key: "email", label: "Email", width: "24%" },
-      { key: "company_name", label: "Company", width: "14%" },
-      { key: "department_name", label: "Department", width: "14%" },
+      { key: "username", label: "Username", width: 170, sortable: true },
+      { key: "full_name", label: "Full Name", width: 210, sortable: true },
+      { key: "email", label: "Email", width: 280, sortable: true },
+      { key: "company_name", label: "Company", width: 210, sortable: true },
+      { key: "department_name", label: "Department", width: 200, sortable: true },
       {
         key: "status_label",
         label: "Status",
-        width: "10%",
+        width: 130,
+        sortable: true,
+        align: "center",
         render: (row) => (
           <Badge bg={row?.is_active ? "success" : "secondary"} text="light">
             {normalizeText(row?.status_label).toUpperCase() || (row?.is_active ? "ACTIVE" : "INACTIVE")}
@@ -594,38 +589,15 @@ export function UserMasterSetupPanel({ users = [], totalUsers = 0 }) {
     [],
   );
 
-  const visibleUserColumnCount = useMemo(
-    () => userColumns.filter((column) => userColumnVisibility[column.key] !== false).length,
-    [userColumnVisibility, userColumns],
-  );
-
-  const visibleUserColumns = useMemo(() => {
-    const nextVisibleColumns = userColumns.filter((column) => userColumnVisibility[column.key] !== false);
-    return nextVisibleColumns.length > 0 ? nextVisibleColumns : userColumns.slice(0, 1);
-  }, [userColumnVisibility, userColumns]);
-
-  const userHeaderMenuPosition = useMemo(() => {
-    const viewportWidth = typeof window === "undefined" ? 0 : window.innerWidth;
-    const viewportHeight = typeof window === "undefined" ? 0 : window.innerHeight;
-    const menuWidth = 240;
-    const menuHeight = Math.min(420, Math.max(160, (userColumns.length * 34) + 56));
-    const rawX = Math.max(8, Number(userHeaderMenuState.x) || 0);
-    const rawY = Math.max(8, Number(userHeaderMenuState.y) || 0);
-
-    return {
-      x: Math.max(8, Math.min(rawX, Math.max(8, viewportWidth - menuWidth - 8))),
-      y: Math.max(8, Math.min(rawY, Math.max(8, viewportHeight - menuHeight - 8))),
-    };
-  }, [userColumns.length, userHeaderMenuState.x, userHeaderMenuState.y]);
-
   const accessColumns = useMemo(
     () => [
-      { key: "application_name", label: "Application", width: "42%" },
-      { key: "role_name", label: "Role", width: "42%" },
+      { key: "application_name", label: "Application", width: 260 },
+      { key: "role_name", label: "Role", width: 260 },
       {
         key: "is_active",
         label: "Status",
-        width: "16%",
+        width: 120,
+        align: "center",
         render: (row) => (
           <Badge bg={row?.is_active ? "success" : "secondary"} text="light">
             {row?.is_active ? "ACTIVE" : "INACTIVE"}
@@ -679,98 +651,6 @@ export function UserMasterSetupPanel({ users = [], totalUsers = 0 }) {
   useEffect(() => {
     loadLookups();
   }, [loadLookups]);
-
-  useEffect(() => {
-    setUserColumnVisibility((previous) => {
-      const next = {};
-
-      userColumns.forEach((column) => {
-        next[column.key] = previous?.[column.key] !== false;
-      });
-
-      return next;
-    });
-  }, [userColumns]);
-
-  const closeUserHeaderMenu = useCallback(() => {
-    setUserHeaderMenuState((current) => ({
-      ...current,
-      open: false,
-    }));
-  }, []);
-
-  const handleUserHeaderContextMenu = useCallback((event) => {
-    const target = event?.target;
-    const inHeader = target instanceof Element ? target.closest("thead th") : null;
-
-    if (!inHeader) {
-      return;
-    }
-
-    event.preventDefault();
-
-    setUserHeaderMenuState({
-      open: true,
-      x: event.clientX,
-      y: event.clientY,
-    });
-  }, []);
-
-  const toggleUserColumnVisibility = useCallback(
-    (columnKey, nextVisible) => {
-      setUserColumnVisibility((previous) => {
-        const currentlyVisible = previous?.[columnKey] !== false;
-        const visibleCount = userColumns.filter((column) => previous?.[column.key] !== false).length;
-
-        if (!nextVisible && currentlyVisible && visibleCount <= 1) {
-          return previous;
-        }
-
-        return {
-          ...previous,
-          [columnKey]: nextVisible,
-        };
-      });
-    },
-    [userColumns],
-  );
-
-  useEffect(() => {
-    if (!userHeaderMenuState.open) {
-      return undefined;
-    }
-
-    const closeIfOutside = (event) => {
-      const target = event?.target;
-      const clickedInside = target instanceof Element ? target.closest(".umsp-column-context-menu") : null;
-
-      if (clickedInside) {
-        return;
-      }
-
-      closeUserHeaderMenu();
-    };
-
-    const closeOnEscape = (event) => {
-      if (event.key === "Escape") {
-        closeUserHeaderMenu();
-      }
-    };
-
-    const closeOnScroll = () => {
-      closeUserHeaderMenu();
-    };
-
-    window.addEventListener("mousedown", closeIfOutside);
-    window.addEventListener("keydown", closeOnEscape);
-    window.addEventListener("scroll", closeOnScroll, true);
-
-    return () => {
-      window.removeEventListener("mousedown", closeIfOutside);
-      window.removeEventListener("keydown", closeOnEscape);
-      window.removeEventListener("scroll", closeOnScroll, true);
-    };
-  }, [closeUserHeaderMenu, userHeaderMenuState.open]);
 
   function requestDiscardDraftConfirmation(onConfirm) {
     if (!panelDirty) {
@@ -1651,10 +1531,10 @@ export function UserMasterSetupPanel({ users = [], totalUsers = 0 }) {
           </div>
         ) : null}
 
-        <SetupTable
+        <Table
           className="umsp-access-table"
           columns={accessColumns}
-          rows={accessRows}
+          data={accessRows}
           rowIdKey="access_key"
           selectedRowId={null}
           emptyMessage="No access mappings assigned."
@@ -1772,56 +1652,17 @@ export function UserMasterSetupPanel({ users = [], totalUsers = 0 }) {
           </div>
         </div>
 
-        <Card bodyClassName="p-0">
-          <SetupTable
-            columns={visibleUserColumns}
-            rows={tableRows}
+        <Card>
+          <Table
+            columns={userColumns}
+            data={tableRows}
             rowIdKey="id"
             selectedRowId={panelUserId}
             onRowClick={(row) => openExistingUserPanel(row, "view")}
             showActionColumn={false}
-            onHeaderContextMenu={handleUserHeaderContextMenu}
             emptyMessage="No users found."
           />
         </Card>
-
-        {userHeaderMenuState.open ? (
-          <div
-            className="psb-ui-table-context-menu umsp-column-context-menu"
-            style={{
-              left: `${userHeaderMenuPosition.x}px`,
-              top: `${userHeaderMenuPosition.y}px`,
-            }}
-            onContextMenu={(event) => event.preventDefault()}
-            role="menu"
-            aria-label="User table columns"
-          >
-            <div className="px-2 pb-1 mb-1 border-bottom small fw-semibold text-uppercase text-muted">Columns</div>
-            {userColumns.map((column) => {
-              const checked = userColumnVisibility[column.key] !== false;
-              const disableToggle = checked && visibleUserColumnCount <= 1;
-
-              return (
-                <label
-                  key={column.key}
-                  className="d-flex align-items-center gap-2 px-2 py-1 small"
-                  style={{
-                    cursor: disableToggle ? "not-allowed" : "pointer",
-                    opacity: disableToggle ? 0.58 : 1,
-                  }}
-                >
-                  <input
-                    type="checkbox"
-                    checked={checked}
-                    disabled={disableToggle}
-                    onChange={(event) => toggleUserColumnVisibility(column.key, event.target.checked)}
-                  />
-                  <span>{column.label}</span>
-                </label>
-              );
-            })}
-          </div>
-        ) : null}
       </section>
 
       <aside className={`umsp-sidepanel ${panelOpen ? "is-open" : ""}`} aria-hidden={!panelOpen}>

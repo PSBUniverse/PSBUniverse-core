@@ -5,7 +5,14 @@ import { getSupabase, initSupabase } from "@/core/supabase/client";
 
 initSupabase(process.env.NEXT_PUBLIC_SUPABASE_URL, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY);
 
-export const AuthContext = createContext(undefined);
+export const DEFAULT_AUTH_CONTEXT = Object.freeze({
+  authUser: null,
+  dbUser: null,
+  roles: [],
+  loading: true,
+});
+
+export const AuthContext = createContext(DEFAULT_AUTH_CONTEXT);
 
 function fallbackUserFromAuth(user) {
   return {

@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { Badge, Button, Card, Input, Modal, SetupTable, toastError, toastSuccess } from "@/shared/components/ui";
+import { Badge, Button, Card, Input, Modal, Table, toastError, toastSuccess } from "@/shared/components/ui";
 import {
   getCompanyDisplayName,
   getCompanyEmail,
@@ -1277,6 +1277,7 @@ export default function CompanyDepartmentSetupClient({
         key: "comp_name",
         label: "Company Name",
         width: "26%",
+        sortable: true,
         render: (row) => {
           const batchState = String(row?.__batchState || "");
           const markerText =
@@ -1306,21 +1307,25 @@ export default function CompanyDepartmentSetupClient({
         key: "comp_short_name",
         label: "Short Name",
         width: "18%",
+        sortable: true,
       },
       {
         key: "comp_email",
         label: "Email",
         width: "26%",
+        sortable: true,
       },
       {
         key: "comp_phone",
         label: "Phone",
         width: "18%",
+        sortable: true,
       },
       {
         key: "is_active_bool",
         label: "Active",
         width: "12%",
+        sortable: true,
         align: "center",
         render: (row) => <StatusBadge isActive={Boolean(row?.is_active_bool)} />,
       },
@@ -1334,6 +1339,7 @@ export default function CompanyDepartmentSetupClient({
         key: "dept_name",
         label: "Department Name",
         width: "48%",
+        sortable: true,
         render: (row) => {
           const batchState = String(row?.__batchState || "");
           const markerText =
@@ -1359,11 +1365,13 @@ export default function CompanyDepartmentSetupClient({
         key: "dept_short_name",
         label: "Short Name",
         width: "30%",
+        sortable: true,
       },
       {
         key: "is_active_bool",
         label: "Active",
         width: "22%",
+        sortable: true,
         align: "center",
         render: (row) => <StatusBadge isActive={Boolean(row?.is_active_bool)} />,
       },
@@ -1583,9 +1591,9 @@ export default function CompanyDepartmentSetupClient({
       <div className="row g-3 align-items-start">
         <div className="col-12 col-xl-6">
           <Card title="Companies" subtitle="Master company records.">
-            <SetupTable
+            <Table
               columns={companyColumns}
-              rows={decoratedCompanies}
+              data={decoratedCompanies}
               rowIdKey="comp_id"
               selectedRowId={selectedCompany?.comp_id ?? null}
               onRowClick={handleCompanyRowClick}
@@ -1601,9 +1609,9 @@ export default function CompanyDepartmentSetupClient({
             subtitle={selectedCompany ? "Company-scoped departments" : "Click a company row to view its departments."}
           >
             {selectedCompany ? (
-              <SetupTable
+              <Table
                 columns={departmentColumns}
-                rows={decoratedDepartments}
+                data={decoratedDepartments}
                 rowIdKey="dept_id"
                 actions={departmentActions}
                 emptyMessage="No departments found for this company."
