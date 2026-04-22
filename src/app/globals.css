@@ -450,6 +450,12 @@
   border: 1px solid #f5c6c6;
 }
 
+.psb-batch-marker-reordered {
+  color: #6b4e10;
+  background: #fff5d6;
+  border: 1px solid #eed99b;
+}
+
 .psb-row-created td,
 .psb-batch-row-new td {
   background: #eefaf4 !important;

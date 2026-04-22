@@ -9,6 +9,7 @@ function Dropdown(props) {
 function DropdownMenu(props) {
   return (
     <BootstrapDropdown.Menu
+      renderOnMount
       {...props}
       style={{ zIndex: 9999, ...props.style }}
     />

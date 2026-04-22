@@ -317,7 +317,10 @@ export default function Table({
       }
 
       normalizedColumns.forEach((column) => {
-        next[column.key] = previous[column.key] !== false;
+        const hasExplicitState = previous[column.key] !== undefined;
+        next[column.key] = hasExplicitState
+          ? previous[column.key] !== false
+          : column.defaultVisible !== false;
       });
 
       if (normalizedColumns.length > 0 && normalizedColumns.every((column) => next[column.key] === false)) {

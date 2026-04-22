@@ -83,306 +83,759 @@ const SNIPPET_TABLE_STATE = `const [tableState, setTableState] = useState({
   columnSizing: {},
 });`;
 
-const SNIPPET_TABLE_DATABIND = `const [rows, setRows] = useState([]);
+const SNIPPET_TABLE_DATABIND = `// ─── FULL END-TO-END: Database → API → Frontend → Table ───
+//
+// DATA SOURCE
+//   Table: psb_s_appcard (Supabase)
+//   Columns: card_id (PK), group_id (FK), card_name, card_desc,
+//            route_path, icon, display_order, is_active
+//
+// LAYER STACK
+//   1. Model   – maps raw DB row → UI-friendly shape
+//   2. Repo    – Supabase queries (ONLY layer that calls .from())
+//   3. Service – business logic, validation, orchestration
+//   4. Hook    – calls service, returns data for the page
+//   5. API     – Next.js route handler (POST /api/card-module-setup/cards)
+//   6. Client  – fetches API, binds data to <Table />
 
-useEffect(() => {
-  async function load() {
-    const payload = await fetchRowsFromApi(tableState);
-    setRows(payload.rows);
-    setTableState((prev) => ({
-      ...prev,
-      pagination: { ...prev.pagination, total: payload.total },
-    }));
-  }
-  load();
-}, [tableState.filters, tableState.sorting,
-    tableState.pagination.page, tableState.pagination.pageSize]);`;
+// ── 1. MODEL ── src/modules/card-module-setup/model/card.model.js
+export function isCardActive(card) {
+  if (card?.is_active === false || card?.is_active === 0) return false;
+  const text = String(card?.is_active ?? "").trim().toLowerCase();
+  return !(text === "false" || text === "0");
+}
 
-const SNIPPET_TABLE_FILTERS_HARDCODE = `// Hardcoded filter items
+export function getCardDisplayName(card) {
+  return card?.card_name || card?.name || "Unknown";
+}
+
+// ── 2. REPO ── src/modules/card-module-setup/repo/cards.repo.js
+const TABLE = "psb_s_appcard";
+
+export async function fetchCardsByGroupId(supabase, groupId) {
+  const { data, error } = await supabase
+    .from(TABLE)
+    .select("*")
+    .eq("group_id", groupId)
+    .order("display_order", { ascending: true });
+
+  if (error) throw new Error(error.message);
+  return Array.isArray(data) ? data : [];
+}
+
+export async function createCard(supabase, payload) {
+  const { data, error } = await supabase
+    .from(TABLE)
+    .insert(payload)
+    .select("*")
+    .single();
+
+  if (error) throw new Error(error.message);
+  return data;
+}
+
+// ── 3. SERVICE ── src/modules/card-module-setup/services/cardModuleSetup.service.js
+import { fetchCardsByGroupId, createCard } from "../repo/cards.repo.js";
+
+export async function getCardList(supabase) {
+  const rows = await fetchAllCards(supabase);
+  return rows.sort((a, b) =>
+    Number(a.display_order || 0) - Number(b.display_order || 0)
+  );
+}
+
+export async function createCardRecord(supabase, payload) {
+  const cardName = String(payload?.card_name ?? "").trim();
+  if (!cardName) throw new Error("Card name is required.");
+  if (!payload?.group_id) throw new Error("Group ID is required.");
+
+  return createCard(supabase, {
+    group_id: payload.group_id,
+    card_name: cardName,
+    card_desc: payload?.card_desc ?? "",
+    route_path: payload?.route_path ?? "#",
+    icon: payload?.icon ?? "bi-grid-3x3-gap",
+    is_active: true,
+  });
+}
+
+// ── 4. HOOK ── src/modules/card-module-setup/hooks/cardModuleSetupData.js
+import { getSupabase } from "../utils/supabase.js";
+import { getCardModuleSetupViewModel } from "../services/cardModuleSetup.service.js";
+
+export async function loadCardModuleSetupData() {
+  const supabase = await getSupabase();
+  return getCardModuleSetupViewModel(supabase);
+}
+
+// ── 5. API ROUTE ── src/app/api/card-module-setup/cards/route.js
+import { NextResponse } from "next/server";
+import { getSupabase } from "@/modules/card-module-setup/utils/supabase.js";
+import { createCardRecord } from "@/modules/card-module-setup/services/cardModuleSetup.service.js";
+
+export async function POST(request) {
+  const body = await request.json().catch(() => ({}));
+  const supabase = await getSupabase();
+  const card = await createCardRecord(supabase, body);
+  return NextResponse.json({ ok: true, card });
+}
+
+// ── 6. CLIENT PAGE ── src/app/card-module-setup/page.js (server component)
+import { loadCardModuleSetupData } from "@/modules/card-module-setup/hooks/cardModuleSetupData.js";
+
+export default async function CardModuleSetupPage() {
+  const { cardGroups, cards } = await loadCardModuleSetupData();
+  return <CardModuleSetupClient seedCardGroups={cardGroups} seedCards={cards} />;
+}
+
+// ── 7. CLIENT COMPONENT ── binds data to Table
+const selectedGroupCards = useMemo(() =>
+  allCards
+    .filter((card) => card.group_id === selectedGroup?.group_id)
+    .sort((a, b) => Number(a.display_order || 0) - Number(b.display_order || 0)),
+  [allCards, selectedGroup?.group_id],
+);
+
+const cardColumns = useMemo(() => [
+  { key: "display_order", label: "Order",  sortable: false, width: 80 },
+  { key: "card_name",     label: "Card",   sortable: true,  width: 200 },
+  { key: "route_path",    label: "Route",  sortable: false, width: 200 },
+  {
+    key: "is_active",
+    label: "Active",
+    width: 100,
+    render: (row) => <Badge bg={row.is_active ? "success" : "secondary"}>
+      {row.is_active ? "Active" : "Inactive"}
+    </Badge>,
+  },
+], []);
+
+<Table
+  columns={cardColumns}
+  data={selectedGroupCards}
+  rowIdKey="card_id"
+  actions={cardActions}
+  emptyMessage="No cards in this group."
+  draggable={true}
+  onReorder={handleCardReorder}
+/>`;
+
+const SNIPPET_TABLE_FILTERS_HARDCODE = `// Hardcoded filter items (use when options are fixed/known at build time)
+//
+// Real example: Card Module Setup — filter cards by active status
 const filterConfig = createFilterConfig([
   {
-    key: "status",
+    key: "is_active",
     label: "Status",
     type: TABLE_FILTER_TYPES.SELECT,
     options: [
-      { label: "Active",  value: "active"  },
-      { label: "Pending", value: "pending" },
+      { label: "Active",   value: true  },
+      { label: "Inactive", value: false },
     ],
   },
 ]);`;
 
-const SNIPPET_TABLE_FILTERS_DATABIND = `// Databind filter items from API
-const [statusOptions, setStatusOptions] = useState([]);
+const SNIPPET_TABLE_FILTERS_DATABIND = `// Databind filter items from API (use when options come from the database)
+//
+// Real example: User Master Setup — role filter loaded from psb_s_app_roles
+// API endpoint: GET /api/user-master-setup/lookups
+//
+// Backend returns: { roles: [{ role_id: 1, role_name: "Admin" }, ...] }
+const [roleOptions, setRoleOptions] = useState([]);
 
 useEffect(() => {
-  fetch("/api/lookup/status")
+  fetch("/api/user-master-setup/lookups")
     .then((r) => r.json())
-    .then((data) => setStatusOptions(data.items));
+    .then((data) => {
+      // Map API response to the { label, value } shape the filter expects
+      const mapped = (data.roles || []).map((role) => ({
+        label: role.role_name,
+        value: role.role_id,
+      }));
+      setRoleOptions(mapped);
+    });
 }, []);
 
 const filterConfig = createFilterConfig([
   {
-    key: "status",
-    label: "Status",
+    key: "role_id",
+    label: "Role",
     type: TABLE_FILTER_TYPES.SELECT,
-    options: statusOptions,
+    options: roleOptions,   // ← populated from the API response
+  },
+  {
+    key: "created_at",
+    label: "Created Date",
+    type: TABLE_FILTER_TYPES.DATERANGE,
+    // No options needed — date range uses a date picker
   },
 ]);`;
 
-const SNIPPET_TABLE_COLUMNS = `const columns = [
-  { key: "employee_code", label: "Code",   sortable: true, width: 140 },
-  { key: "full_name",     label: "Name",   sortable: true, width: 200 },
+const SNIPPET_TABLE_COLUMNS = `// Real example: Card Module Setup — card groups table columns
+// Source table: psb_m_appcardgroup
+// Columns map directly to database fields
+const groupColumns = useMemo(() => [
+  // "Order" shows the display_order field (drag-to-reorder sets this)
+  { key: "display_order", label: "Order",       sortable: false, width: 80  },
+  // "Group Name" is the primary identifier
+  { key: "group_name",    label: "Group Name",  sortable: true,  width: 220 },
+  // "Description" is optional context
+  { key: "group_desc",    label: "Description", sortable: false, width: 250 },
+  // "Icon" — hidden by default, available via Customize Table panel
+  { key: "icon",          label: "Icon",        sortable: false, width: 120, defaultVisible: false },
+  // "Active" — render with Badge for visual status
   {
-    key: "status",
-    label: "Status",
-    sortable: true,
-    width: 130,
-    render: (row) => <Badge bg="success">{row.status}</Badge>,
+    key: "is_active",
+    label: "Active",
+    sortable: false,
+    width: 100,
+    render: (row) => (
+      <Badge bg={row.is_active ? "success" : "secondary"}>
+        {row.is_active ? "Yes" : "No"}
+      </Badge>
+    ),
   },
-];`;
+], []);
 
-const SNIPPET_TABLE_ACTIONS = `const actions = [
-  {
-    key: "preview",
-    label: "Preview",
-    type: "primary",
-    onClick: (row) => openRow(row),
-  },
+// Column options:
+//   key            — matches the field name in the row object (from DB)
+//   label          — column header text
+//   sortable       — enables click-to-sort on this column
+//   width          — pixel width
+//   defaultVisible — set to false to hide on first render (still in Customize panel)
+//   render         — custom cell renderer: (row) => ReactNode`;
+
+const SNIPPET_TABLE_ACTIONS = `// Real example: Card Module Setup — row actions for the card groups table
+// Actions appear as a dropdown in the leftmost "Actions" column
+//
+// Each action needs: key, label, type, onClick
+// Optional: visible, disabled, confirm, confirmMessage, icon
+const groupActions = useMemo(() => [
   {
     key: "edit",
     label: "Edit",
-    type: "secondary",
-    visible: (row) => row.status === "active",
-    disabled: (row) => row.role === "admin",
-    onClick: (row) => editRow(row),
+    type: "primary",           // primary | secondary | danger
+    icon: "pencil-square",     // Bootstrap Icons class (without "bi-" prefix)
+    onClick: (row) => {
+      // Open edit dialog pre-filled with this group's data
+      setDialog({ kind: "edit-group", groupId: row.group_id });
+      setGroupDraft({
+        name: row.group_name,
+        desc: row.group_desc || "",
+        icon: row.icon || "",
+      });
+    },
   },
   {
     key: "deactivate",
     label: "Deactivate",
     type: "danger",
+    icon: "x-octagon",
+    // Only show for active, non-pending groups
+    visible: (row) => row.is_active && !isTempGroupId(row.group_id),
+    // Confirm dialog before executing
     confirm: true,
-    confirmMessage: (row) => \`Deactivate \${row.full_name}?\`,
-    onClick: (row) => deactivateRow(row),
+    confirmMessage: (row) => \`Deactivate group "\${row.group_name}"?\`,
+    onClick: (row) => {
+      // Add to batch deactivation list (saved on "Save Batch")
+      setPendingBatch((prev) => ({
+        ...prev,
+        groupDeactivations: [...prev.groupDeactivations, row.group_id],
+      }));
+    },
   },
-];`;
+], []);
 
-const SNIPPET_TABLE_ONCHANGE = `function handleTableChange(event) {
+// Action type determines button color:
+//   "primary"   → blue
+//   "secondary" → gray
+//   "danger"    → red`;
+
+const SNIPPET_TABLE_ONCHANGE = `// onChange receives ALL table events through a single channel.
+// event.type tells you what happened. Switch on it.
+//
+// Real example from: useDataTableModuleController.js (Data Table Example)
+//
+// Event types emitted by <Table />:
+//   "search"           → user typed in the search bar
+//   "filters"          → user changed a filter dropdown / date range
+//   "sorting"          → user clicked a sortable column header
+//   "pagination"       → user changed page or page size
+//   "action"           → user clicked a row action button
+//   "export"           → user clicked CSV/Excel export
+//   "columnVisibility" → user toggled a column in Customize panel
+//   "columnResize"     → user resized a column by dragging
+
+function handleTableChange(event) {
   switch (event.type) {
     case "search":
+      // event.value = search string
       setTableState((prev) => ({
         ...prev,
         filters: { ...prev.filters, search: event.value },
         pagination: { ...prev.pagination, page: 1 },
       }));
       break;
+
     case "filters":
+      // event.filters = full filter object from filter bar
       setTableState((prev) => ({
         ...prev,
         filters: event.filters,
         pagination: { ...prev.pagination, page: 1 },
       }));
       break;
+
     case "sorting":
+      // event.sorting = { key: "column_key", direction: "asc" | "desc" }
       setTableState((prev) => ({
         ...prev,
         sorting: event.sorting,
         pagination: { ...prev.pagination, page: 1 },
       }));
       break;
+
     case "pagination":
+      // event.pagination = { page: number, pageSize: number }
       setTableState((prev) => ({
         ...prev,
         pagination: { ...prev.pagination, ...event.pagination },
       }));
       break;
+
     case "action":
-            {
+      // event.action = the action config object
+      // event.row = the row data object
       event.action.onClick(event.row);
       break;
+
     case "export":
+      // event.format = "csv" | "excel"
       callExportApi(event.format);
       break;
-    default:
+
+    case "columnVisibility":
+      // event.columnVisibility = { columnKey: boolean }
+      setTableState((prev) => ({
+        ...prev,
+        columnVisibility: event.columnVisibility,
+      }));
       break;
   }
 }`;
 
 const SNIPPET_BUTTON = `import { Button } from "@/shared/components/ui";
 
-<Button variant="primary"   onClick={save}>Save</Button>
-    {
-<Button variant="secondary" onClick={back}>Back</Button>
-<Button variant="danger"    onClick={del}>Delete</Button>
-<Button variant="ghost"     onClick={help}>Help</Button>
-<Button variant="primary"   loading={saving}>Saving\u2026</Button>
-<Button variant="primary"   disabled>Disabled</Button>`;
+// Variants determine the visual style and semantic meaning:
+//   "primary"   → main action (Save, Submit, Approve)
+//   "secondary" → secondary action (Cancel, Back, Reset)
+//   "danger"    → destructive action (Delete, Deactivate, Reject)
+//   "ghost"     → subtle/text-only action (Help, View Details)
+
+// Real example: Card Module Setup batch save toolbar
+<Button variant="primary" loading={isSaving} onClick={handleSaveBatch}>
+  Save Batch ({pendingSummary.total})
+</Button>
+<Button variant="secondary" onClick={handleCancelBatch} disabled={isSaving}>
+  Cancel
+</Button>
+
+// Real example: Modal footer with save flow
+<Button variant="ghost" onClick={closeDialog} disabled={isMutatingAction}>
+  Cancel
+</Button>
+<Button variant="primary" loading={isMutatingAction} onClick={handleConfirmAddGroup}>
+  Add Group
+</Button>
+
+// Disabled state — prevents all interaction
+<Button variant="primary" disabled>Disabled</Button>`;
 
 const SNIPPET_INPUT = `import { Input } from "@/shared/components/ui";
 
+// Real example: Card Module Setup — Add Card Group dialog form fields
+// Draft state holds the form values
+const [groupDraft, setGroupDraft] = useState({ name: "", desc: "", icon: "" });
+
+// Group name input — required field
 <Input
-  value={email}
-  onChange={(e) => setEmail(e.target.value)}
-  placeholder="name@company.com"
-  isInvalid={showError}
+  value={groupDraft.name}
+  onChange={(e) => setGroupDraft((prev) => ({ ...prev, name: e.target.value }))}
+  placeholder="Enter group name"
+  isInvalid={!groupDraft.name.trim()}   // red border when empty
 />
-<Input value="READ-ONLY-001" disabled />`;
+
+// Description input — optional field
+<Input
+  value={groupDraft.desc}
+  onChange={(e) => setGroupDraft((prev) => ({ ...prev, desc: e.target.value }))}
+  placeholder="Optional description"
+/>
+
+// Read-only display (e.g. showing a generated ID)
+<Input value="GRP-10042" disabled />`;
 
 const SNIPPET_SEARCHBAR = `import { SearchBar } from "@/shared/components/ui";
 
+// SearchBar debounces input so API calls don't fire on every keystroke.
+// onDebouncedChange fires after the user stops typing for debounceMs.
+//
+// Real example: Data Table Example — search bar triggers table reload
 <SearchBar
-      {
-  value={search}
+  value={tableState.filters?.search || ""}
   debounceMs={350}
-  placeholder="Search records"
-  onDebouncedChange={(next) => {
-    setSearch(next);
-    reloadData(next);
+  placeholder="Search code, name, team, role, status"
+  onDebouncedChange={(nextValue) => {
+    // Update table state → triggers data re-fetch
+    setTableState((prev) => ({
+      ...prev,
+      filters: { ...prev.filters, search: nextValue },
+      pagination: { ...prev.pagination, page: 1 },
+    }));
   }}
 />`;
 
 const SNIPPET_DROPDOWN_BASIC = `import { Dropdown } from "@/shared/components/ui";
 
+// Basic dropdown — static menu items, click handlers
+// Used for: row action menus, toolbar option menus
 <Dropdown>
   <Dropdown.Toggle variant="secondary" size="sm">
     Actions
   </Dropdown.Toggle>
   <Dropdown.Menu>
-    <Dropdown.Item onClick={view}>View</Dropdown.Item>
-    <Dropdown.Item onClick={edit}>Edit</Dropdown.Item>
+    <Dropdown.Item onClick={handleEdit}>Edit</Dropdown.Item>
+    <Dropdown.Item onClick={handleDuplicate}>Duplicate</Dropdown.Item>
     <Dropdown.Divider />
-    <Dropdown.Item onClick={remove}>Delete</Dropdown.Item>
+    <Dropdown.Item onClick={handleDeactivate}>Deactivate</Dropdown.Item>
   </Dropdown.Menu>
 </Dropdown>`;
 
-const SNIPPET_DROPDOWN_DATABIND = `const [items, setItems] = useState([]);
+const SNIPPET_DROPDOWN_DATABIND = `// Databind dropdown from API
+//
+// Real example: Card Module Setup — Application Selector
+// Data source: psb_s_application table
+// API: loaded via server component props (seedApplications)
+//
+// The page.js server component fetches applications:
+//   const applications = await loadApplications();
+//   return <CardModuleSetupClient seedApplications={applications} />;
+//
+// Client component binds to a <select> (or Dropdown):
+const [selectedApp, setSelectedApp] = useState(null);
 
-useEffect(() => {
-  fetch("/api/lookup/teams")
-    .then((r) => r.json())
-    .then((data) => setItems(data.items));
-}, []);
+// Using native <select> for application selector (simpler for single-value):
+<Form.Select
+  value={selectedApp?.app_id ?? ""}
+  onChange={(e) => {
+    const appId = Number(e.target.value);
+    const app = applications.find((a) => a.app_id === appId);
+    setSelectedApp(app);
+  }}
+>
+  <option value="" disabled>Select Application</option>
+  {applications.map((app) => (
+    <option key={app.app_id} value={app.app_id}>
+      {app.app_name}
+    </option>
+  ))}
+</Form.Select>
 
+// Using Dropdown for richer display:
 <Dropdown>
   <Dropdown.Toggle variant="secondary" size="sm">
-    {selected || "Select Team"}
+    {selectedApp?.app_name || "Select Application"}
   </Dropdown.Toggle>
   <Dropdown.Menu>
-    {items.map((item) => (
-      <Dropdown.Item key={item.value} onClick={() => setSelected(item.label)}>
-        {item.label}
+    {applications.map((app) => (
+      <Dropdown.Item
+        key={app.app_id}
+        onClick={() => setSelectedApp(app)}
+      >
+        {app.app_name}
       </Dropdown.Item>
     ))}
   </Dropdown.Menu>
 </Dropdown>`;
 
-const SNIPPET_DROPDOWN_HARDCODE = `// Hardcoded combo items
-const teamItems = [
-  { label: "Platform",   value: "platform"   },
-  { label: "Operations", value: "operations" },
-  { label: "Risk",       value: "risk"       },
+const SNIPPET_DROPDOWN_HARDCODE = `// Hardcoded combo items (use when options are known at build time)
+//
+// Real example: status filter options for a table
+const statusItems = [
+  { label: "Active",    value: "active"    },
+  { label: "Pending",   value: "pending"   },
+  { label: "Inactive",  value: "inactive"  },
+  { label: "Suspended", value: "suspended" },
 ];
 
 <Dropdown.Menu>
-  {teamItems.map((item) => (
+  {statusItems.map((item) => (
     <Dropdown.Item key={item.value} onClick={() => onSelect(item.value)}>
       {item.label}
     </Dropdown.Item>
   ))}
 </Dropdown.Menu>`;
 
-const SNIPPET_INPUT_VALIDATION = `const [email, setEmail] = useState("");
-const [showError, setShowError] = useState(false);
-const emailHasError = showError && !/^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$/.test(email.trim());
+const SNIPPET_INPUT_VALIDATION = `// Input with validation — show error only after user interaction
+//
+// Real example: Card Module Setup — validate group name before saving
+const [groupDraft, setGroupDraft] = useState({ name: "", desc: "", icon: "" });
+const [touched, setTouched] = useState(false);
+const nameError = touched && !groupDraft.name.trim();
 
 <Input
-  value={email}
-  onChange={(e) => setEmail(e.target.value)}
-  placeholder="Email"
-  isInvalid={emailHasError}
+  value={groupDraft.name}
+  onChange={(e) => setGroupDraft((prev) => ({ ...prev, name: e.target.value }))}
+  onBlur={() => setTouched(true)}           // mark as touched on blur
+  placeholder="Group Name"
+  isInvalid={nameError}                     // red border when empty + touched
 />
-<Button onClick={() => setShowError(true)}>Validate</Button>`;
+{nameError && <p className="field-error">Group name is required.</p>}
+
+// In the submit handler:
+const handleConfirmAddGroup = () => {
+  setTouched(true);
+  if (!groupDraft.name.trim()) {
+    toastError("Group name is required.", "Validation");
+    return;
+  }
+  // ... proceed with API call
+};`;
 
 const SNIPPET_MODAL = `import { Modal, Button } from "@/shared/components/ui";
 
+// Modal is used for: confirmation dialogs, add/edit forms, workflow actions
+//
+// Real example: Card Module Setup — Add Card Group dialog
+const [dialog, setDialog] = useState({ kind: null });
+const [isMutatingAction, setIsMutatingAction] = useState(false);
+
 <Modal
-  show={open}
-  onHide={() => setOpen(false)}
-  title="Confirm Change"
+  show={dialog.kind === "add-group"}
+  onHide={() => setDialog({ kind: null })}
+  title="Add Card Group"
   footer={
     <>
-      <Button variant="secondary" onClick={() => setOpen(false)}>Cancel</Button>
-      <Button variant="primary" loading={saving} onClick={submit}>Save</Button>
+      <Button variant="ghost" onClick={() => setDialog({ kind: null })} disabled={isMutatingAction}>
+        Cancel
+      </Button>
+      <Button variant="primary" loading={isMutatingAction} onClick={handleConfirmAddGroup}>
+        Add Group
+      </Button>
     </>
   }
 >
-  <p>Change this item now?</p>
+  <Input
+    value={groupDraft.name}
+    onChange={(e) => setGroupDraft((prev) => ({ ...prev, name: e.target.value }))}
+    placeholder="Group Name"
+  />
+  <Input
+    value={groupDraft.desc}
+    onChange={(e) => setGroupDraft((prev) => ({ ...prev, desc: e.target.value }))}
+    placeholder="Description (optional)"
+  />
 </Modal>`;
 
-const SNIPPET_SEARCHBAR_WITH_API = `const [search, setSearch] = useState("");
-const [results, setResults] = useState([]);
+const SNIPPET_SEARCHBAR_WITH_API = `// SearchBar with server-side search (for large datasets)
+//
+// Real example: Data Table Example — server-side search via API
+// API endpoint: GET /api/examples/data-table?search=query&page=1&pageSize=10
+//
+// The controller hook sends the search term as a query parameter:
+const loadData = useCallback(async () => {
+  setLoading(true);
+  try {
+    const params = new URLSearchParams({
+      page: String(tableState.pagination.page),
+      pageSize: String(tableState.pagination.pageSize),
+      search: tableState.filters?.search || "",
+      sortKey: tableState.sorting?.key || "",
+      sortDir: tableState.sorting?.direction || "",
+    });
 
-const loadData = async (query) => {
-  const payload = await fetch(\`/api/search?q=\${query}\`)
-    .then((r) => r.json());
-  setResults(payload.items || []);
-};
+    // Append active filters
+    Object.entries(tableState.filters || {}).forEach(([key, value]) => {
+      if (key !== "search" && value) params.set(key, String(value));
+    });
 
+    const response = await fetch(\`/api/examples/data-table?\${params}\`);
+    const payload = await response.json();
+
+    setRows(payload.rows || []);
+    setTableState((prev) => ({
+      ...prev,
+      pagination: { ...prev.pagination, total: payload.total || 0 },
+    }));
+  } finally {
+    setLoading(false);
+  }
+}, [tableState.filters, tableState.sorting, tableState.pagination.page, tableState.pagination.pageSize]);
+
+// The SearchBar is built into <Table /> via searchPlaceholder prop,
+// OR you can use it standalone:
 <SearchBar
   value={search}
   debounceMs={350}
-  placeholder="Search records..."
+  placeholder="Search employees..."
   onDebouncedChange={(next) => {
     setSearch(next);
-    if (next) loadData(next);
+    loadData(next);
   }}
-/>
-{results.length > 0 && <List items={results} />}`;
+/>`;
 
-const SNIPPET_MODAL_SAVE_FLOW = `const [open, setOpen] = useState(false);
-const [saving, setSaving] = useState(false);
+const SNIPPET_MODAL_SAVE_FLOW = `// Modal with full save-to-API flow
+//
+// Real example: Card Module Setup — Add Card Group with API call
+// API: POST /api/card-module-setup/card-groups
+// Request body: { app_id, group_name, group_desc, icon }
+//
+const [dialog, setDialog] = useState({ kind: null });
+const [isMutatingAction, setIsMutatingAction] = useState(false);
+const [groupDraft, setGroupDraft] = useState({ name: "", desc: "", icon: "" });
 
-const handleSave = async () => {
-  setSaving(true);
+const handleConfirmAddGroup = async () => {
+  const groupName = groupDraft.name.trim();
+  if (!groupName) {
+    toastError("Group name is required.", "Validation");
+    return;
+  }
+
+  setIsMutatingAction(true);
   try {
-    await saveToApi(data);
-    toastSuccess("Saved.", "Success");
-    setOpen(false);
+    const response = await fetch("/api/card-module-setup/card-groups", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        app_id: selectedApp.app_id,
+        group_name: groupName,
+        group_desc: groupDraft.desc.trim(),
+        icon: groupDraft.icon.trim() || "bi-collection",
+      }),
+    });
+
+    const payload = await response.json();
+    if (!response.ok) throw new Error(payload?.error || "Failed to create group.");
+
+    toastSuccess("Card group added to batch.", "Add Group");
+    setDialog({ kind: null });
+    setGroupDraft({ name: "", desc: "", icon: "" });
   } catch (err) {
-    toastError("Save failed.", "Error");
+    toastError(err.message, "Error");
   } finally {
-    setSaving(false);
+    setIsMutatingAction(false);
   }
 };
 
 <Modal
-  show={open}
-  onHide={() => setOpen(false)}
-  title="Confirm Change"
+  show={dialog.kind === "add-group"}
+  onHide={() => !isMutatingAction && setDialog({ kind: null })}
+  title="Add Card Group"
   footer={
     <>
-      <Button variant="secondary" onClick={() => setOpen(false)}>Cancel</Button>
-      <Button variant="primary" loading={saving} onClick={handleSave}>Save</Button>
+      <Button variant="ghost" onClick={() => setDialog({ kind: null })} disabled={isMutatingAction}>
+        Cancel
+      </Button>
+      <Button variant="primary" loading={isMutatingAction} onClick={handleConfirmAddGroup}>
+        Add Group
+      </Button>
     </>
   }
 >
-  <p>Change this item now?</p>
+  <Input value={groupDraft.name} onChange={(e) => setGroupDraft(p => ({...p, name: e.target.value}))} placeholder="Group Name" />
+  <Input value={groupDraft.desc} onChange={(e) => setGroupDraft(p => ({...p, desc: e.target.value}))} placeholder="Description" />
 </Modal>`;
 
 const SNIPPET_BADGE = `import { Badge } from "@/shared/components/ui";
 
-<Badge bg="success">Active</Badge>
-<Badge bg="warning" text="dark">Pending</Badge>
-<Badge bg="secondary">Inactive</Badge>
-<Badge bg="dark">Suspended</Badge>`;
+// Badge displays status labels with color-coded backgrounds.
+// Used inside table column renderers to show row status visually.
+//
+// Real example: Card Module Setup — is_active column renderer
+{
+  key: "is_active",
+  label: "Active",
+  width: 100,
+  render: (row) => (
+    <Badge bg={row.is_active ? "success" : "secondary"}>
+      {row.is_active ? "Yes" : "No"}
+    </Badge>
+  ),
+}
+
+// Real example: User Master Setup — user status column
+{
+  key: "status",
+  label: "Status",
+  render: (row) => {
+    const map = {
+      active:   { bg: "success",   text: "light" },
+      pending:  { bg: "warning",   text: "dark"  },
+      inactive: { bg: "secondary", text: "light" },
+    };
+    const s = map[row.status] || { bg: "dark", text: "light" };
+    return <Badge bg={s.bg} text={s.text}>{row.status}</Badge>;
+  },
+}
+
+// Available bg values: success, warning, secondary, danger, dark, primary, info`;
 
 const SNIPPET_TOAST = `import { toastSuccess, toastError, toastWarning, toastInfo } from "@/shared/components/ui";
 
-toastSuccess("Saved successfully.", "Save");
-toastError("Something failed.", "Error");
-toastWarning("Needs review.", "Warning");
-toastInfo("FYI note.", "Info");
+// Toast shows temporary notification messages in the top-right corner.
+// GlobalToastHost is already mounted once in the app layout — do NOT add it again.
+//
+// Real examples from Card Module Setup:
+//
+// After batch save succeeds:
+toastSuccess(\`Saved \${pendingSummary.total} batched change(s).\`, "Save Batch");
 
-// GlobalToastHost is already mounted once in app layout \u2014 do not add it again.`;
+// After an API call fails:
+toastError(error?.message || "Failed to save batched changes.", "Error");
+
+// After adding a card to pending batch:
+toastSuccess("Card added to batch.", "Add Card");
+
+// Warning for unsaved changes:
+toastWarning("You have unsaved changes.", "Warning");
+
+// Informational message:
+toastInfo("Drag rows to reorder.", "Tip");
+
+// Signature: toastSuccess(message, title?)
+// All four variants: toastSuccess, toastError, toastWarning, toastInfo`;
+
+const SNIPPET_CARD_SURFACE = `import { Card } from "@/shared/components/ui";
+
+// Card is a container surface with optional title, subtitle, and toolbar.
+// Used to wrap tables, forms, and content sections on setup pages.
+//
+// Real example: Card Module Setup — left panel wraps Card Groups table
+<Card
+  title="Card Groups"
+  subtitle="Drag rows to reorder groups"
+  toolbar={
+    <Button size="sm" variant="primary" onClick={() => setDialog({ kind: "add-group" })}>
+      <i className="bi bi-plus-lg" /> Add Group
+    </Button>
+  }
+>
+  <Table
+    columns={groupColumns}
+    data={decoratedAppGroups}
+    rowIdKey="group_id"
+    actions={groupActions}
+    emptyMessage="No card groups for this application."
+    draggable={!isSaving}
+    onReorder={handleGroupReorder}
+  />
+</Card>
+
+// Props:
+//   title    (string)    — Card header text
+//   subtitle (string)    — Smaller text below title
+//   toolbar  (ReactNode) — Right-aligned header content (buttons, etc.)
+//   children (ReactNode) — Card body content`;
 
 const SNIPPET_TOKENS = `/* Design tokens \u2014 from src/styles/variables.css */
 
@@ -2224,21 +2677,69 @@ function ReferenceTab() {
       title: "Table",
       content: (
         <div className={styles.refBody}>
+          <p className={styles.stepNote}>
+            The shared Table component is a fully-featured data grid with sorting, filtering, pagination,
+            column visibility, drag-to-reorder, row actions, and CSV/Excel export.
+            It uses a single <code>onChange</code> event channel for all interactions.
+          </p>
+          <p className={styles.ruleHeading}>Props Reference</p>
           <div className={styles.propGrid}>
-            <RefPropRow prop="data"            required type="Array<object>"  desc="Rows for the current page." />
-            <RefPropRow prop="columns"         required type="Array<column>"  desc="key, label, sortable, width, render." />
-            <RefPropRow prop="state"           required type="object"         desc="filters, sorting, pagination, columnVisibility, columnSizing." />
-            <RefPropRow prop="filterConfig"    required type="Array<filter>"  desc="Built with createFilterConfig + TABLE_FILTER_TYPES." />
-            <RefPropRow prop="actions"         required type="Array<action>"  desc="Row actions. Empty array hides ActionColumn." />
-            <RefPropRow prop="onChange"        required type="function"       desc="Single event channel for all table interactions." />
-            <RefPropRow prop="loading"         required type="boolean"        desc="Shows loading state in the table body." />
-            <RefPropRow prop="pageSizeOptions"          type="number[]"       desc="e.g. [10, 20, 50]" />
-            <RefPropRow prop="exportFormats"            type="string[]"       desc='["csv"] or ["csv","excel"]' />
-            <RefPropRow prop="searchPlaceholder"        type="string"         desc="Search bar hint text." />
+            <RefPropRow prop="data"              required type="Array&lt;object&gt;"  desc="Rows for the current page." />
+            <RefPropRow prop="columns"           required type="Array&lt;column&gt;"  desc="key, label, sortable, width, render, defaultVisible." />
+            <RefPropRow prop="state"             required type="object"               desc="filters, sorting, pagination, columnVisibility, columnSizing." />
+            <RefPropRow prop="filterConfig"      required type="Array&lt;filter&gt;"  desc="Built with createFilterConfig + TABLE_FILTER_TYPES." />
+            <RefPropRow prop="actions"           required type="Array&lt;action&gt;"  desc="Row actions. Empty array hides ActionColumn." />
+            <RefPropRow prop="onChange"          required type="function"              desc="Single event channel for all table interactions." />
+            <RefPropRow prop="loading"           required type="boolean"              desc="Shows loading state in the table body." />
+            <RefPropRow prop="rowIdKey"                   type="string"               desc="Unique row identifier key (e.g. 'card_id'). Required for drag-to-reorder." />
+            <RefPropRow prop="draggable"                  type="boolean"              desc="Enable drag-to-reorder rows." />
+            <RefPropRow prop="onReorder"                  type="function"             desc="(reorderedRows) => void. Called after drag completes." />
+            <RefPropRow prop="pageSizeOptions"            type="number[]"             desc="e.g. [10, 20, 50]" />
+            <RefPropRow prop="exportFormats"              type="string[]"             desc='["csv"] or ["csv","excel"]' />
+            <RefPropRow prop="searchPlaceholder"          type="string"               desc="Search bar hint text." />
+            <RefPropRow prop="emptyMessage"               type="string"               desc="Message shown when data is empty." />
           </div>
-          <Snippet title="How to databind table" code={SNIPPET_TABLE_DATABIND} />
-          <Snippet title="Hardcode filters" code={SNIPPET_TABLE_FILTERS_HARDCODE} />
-          <Snippet title="Databind filters" code={SNIPPET_TABLE_FILTERS_DATABIND} />
+
+          <hr style={{ margin: "2rem 0", borderColor: "#ddd" }} />
+          <p className={styles.ruleHeading}>How to Databind Table (End-to-End: Database → API → Frontend)</p>
+          <p className={styles.stepNote}>
+            This is the <strong>complete flow</strong> for binding a Supabase database table to the shared Table component.
+            Real example from: Card Module Setup (table: <code>psb_s_appcard</code>).
+          </p>
+          <Snippet title="Full Data Binding Flow (DB → API → Frontend → Table)" code={SNIPPET_TABLE_DATABIND} />
+
+          <hr style={{ margin: "2rem 0", borderColor: "#ddd" }} />
+          <p className={styles.ruleHeading}>Column Configuration</p>
+          <p className={styles.stepNote}>
+            Columns map to database fields. Each column defines how a field is displayed in the table.
+          </p>
+          <Snippet title="Real column config (from Card Module Setup)" code={SNIPPET_TABLE_COLUMNS} />
+
+          <hr style={{ margin: "2rem 0", borderColor: "#ddd" }} />
+          <p className={styles.ruleHeading}>Row Actions</p>
+          <p className={styles.stepNote}>
+            Actions appear as a dropdown in the leftmost column. Each action can be conditionally visible/disabled.
+          </p>
+          <Snippet title="Real actions config (from Card Module Setup)" code={SNIPPET_TABLE_ACTIONS} />
+
+          <hr style={{ margin: "2rem 0", borderColor: "#ddd" }} />
+          <p className={styles.ruleHeading}>onChange Event Handler</p>
+          <p className={styles.stepNote}>
+            Every table interaction flows through one callback. Switch on <code>event.type</code>.
+          </p>
+          <Snippet title="onChange handler (all event types)" code={SNIPPET_TABLE_ONCHANGE} />
+
+          <hr style={{ margin: "2rem 0", borderColor: "#ddd" }} />
+          <p className={styles.ruleHeading}>Filter Configuration</p>
+          <Snippet title="Hardcoded filters (fixed options)" code={SNIPPET_TABLE_FILTERS_HARDCODE} />
+          <Snippet title="Databind filters from API (dynamic options)" code={SNIPPET_TABLE_FILTERS_DATABIND} />
+
+          <hr style={{ margin: "2rem 0", borderColor: "#ddd" }} />
+          <p className={styles.ruleHeading}>Table State</p>
+          <p className={styles.stepNote}>
+            The table is controlled. Your module owns the state object and updates it via onChange.
+          </p>
+          <Snippet title="Table state structure" code={SNIPPET_TABLE_STATE} />
         </div>
       ),
     },
@@ -2247,6 +2748,10 @@ function ReferenceTab() {
       title: "Button",
       content: (
         <div className={styles.refBody}>
+          <p className={styles.stepNote}>
+            Shared button with variant-based styling, loading spinner, and disabled state.
+            Used for: save/cancel actions, toolbar buttons, modal footers.
+          </p>
           <div className={styles.propGrid}>
             <RefPropRow prop="variant"  required type="string"   desc="primary | secondary | danger | ghost" />
             <RefPropRow prop="onClick"  required type="function" desc="Click handler." />
@@ -2254,7 +2759,7 @@ function ReferenceTab() {
             <RefPropRow prop="disabled"          type="boolean"  desc="Prevents interaction." />
             <RefPropRow prop="size"              type="string"   desc="sm | md (default)" />
           </div>
-          <Snippet title="Button usage" code={SNIPPET_BUTTON} />
+          <Snippet title="Button usage (real examples from Card Module Setup)" code={SNIPPET_BUTTON} />
         </div>
       ),
     },
@@ -2273,8 +2778,18 @@ function ReferenceTab() {
       title: "Dropdown (combo box)",
       content: (
         <div className={styles.refBody}>
-          <Snippet title="Basic usage" code={SNIPPET_DROPDOWN_BASIC} />
-          <Snippet title="How to databind combo box" code={SNIPPET_DROPDOWN_DATABIND} />
+          <p className={styles.stepNote}>
+            Dropdown wraps Bootstrap&apos;s Dropdown for menus and combo box selectors.
+            Used for: action menus, application selectors, form field selectors.
+          </p>
+          <div className={styles.propGrid}>
+            <RefPropRow prop="children" required type="ReactNode"  desc="Must contain Dropdown.Toggle + Dropdown.Menu." />
+            <RefPropRow prop="show"              type="boolean"    desc="Controlled visibility. Omit for uncontrolled." />
+            <RefPropRow prop="onToggle"          type="function"   desc="(show: boolean) => void. Called when visibility changes." />
+            <RefPropRow prop="drop"              type="string"     desc="'up' | 'down' | 'start' | 'end'. Menu direction." />
+          </div>
+          <Snippet title="Basic dropdown (static items)" code={SNIPPET_DROPDOWN_BASIC} />
+          <Snippet title="Databind from API (real example: Application Selector)" code={SNIPPET_DROPDOWN_DATABIND} />
           <Snippet title="Hardcoded combo items" code={SNIPPET_DROPDOWN_HARDCODE} />
         </div>
       ),
@@ -2289,13 +2804,22 @@ function ReferenceTab() {
       title: "Badge",
       content: (
         <div className={styles.refBody}>
+          <p className={styles.stepNote}>
+            Badge renders a small colored label. Commonly used inside table column renderers
+            to display status (active/inactive/pending) with visual distinction.
+          </p>
+          <div className={styles.propGrid}>
+            <RefPropRow prop="bg"       required type="string"    desc="success | warning | secondary | danger | dark | primary | info" />
+            <RefPropRow prop="text"              type="string"    desc="'light' | 'dark'. Text color for contrast." />
+            <RefPropRow prop="children" required type="ReactNode" desc="Label text." />
+          </div>
           <div className={styles.badgeRow}>
             <Badge bg="success">Active</Badge>
             <Badge bg="warning" text="dark">Pending</Badge>
             <Badge bg="secondary">Inactive</Badge>
             <Badge bg="dark">Suspended</Badge>
           </div>
-          <Snippet title="Badge usage" code={SNIPPET_BADGE} />
+          <Snippet title="Badge in table column renderer (real examples)" code={SNIPPET_BADGE} />
         </div>
       ),
     },
@@ -2304,13 +2828,41 @@ function ReferenceTab() {
       title: "Toast",
       content: (
         <div className={styles.refBody}>
+          <p className={styles.stepNote}>
+            Toast fires a temporary notification in the top-right corner.
+            <code>GlobalToastHost</code> is mounted once in the app layout — never add it again.
+            Just call the function from anywhere.
+          </p>
+          <div className={styles.propGrid}>
+            <RefPropRow prop="message"  required type="string" desc="Notification text." />
+            <RefPropRow prop="title"             type="string" desc="Optional header for the toast." />
+          </div>
           <div className={styles.actionRow}>
             <Button size="sm" variant="primary"   onClick={() => toastSuccess("Done.", "Success")}>Success</Button>
             <Button size="sm" variant="secondary" onClick={() => toastInfo("FYI.", "Info")}>Info</Button>
             <Button size="sm" variant="secondary" onClick={() => toastWarning("Check.", "Warning")}>Warning</Button>
             <Button size="sm" variant="danger"    onClick={() => toastError("Failed.", "Error")}>Error</Button>
           </div>
-          <Snippet title="Toast usage" code={SNIPPET_TOAST} />
+          <Snippet title="Toast usage (real examples from Card Module Setup)" code={SNIPPET_TOAST} />
+        </div>
+      ),
+    },
+    {
+      key: "ref-card",
+      title: "Card (surface container)",
+      content: (
+        <div className={styles.refBody}>
+          <p className={styles.stepNote}>
+            Card wraps content sections with an optional title, subtitle, and toolbar area.
+            Used on every setup page to frame tables and form sections.
+          </p>
+          <div className={styles.propGrid}>
+            <RefPropRow prop="title"    type="string"    desc="Card header text." />
+            <RefPropRow prop="subtitle" type="string"    desc="Smaller text below title." />
+            <RefPropRow prop="toolbar"  type="ReactNode" desc="Right-aligned header content (buttons)." />
+            <RefPropRow prop="children" required type="ReactNode" desc="Card body content." />
+          </div>
+          <Snippet title="Card usage (real example from Card Module Setup)" code={SNIPPET_CARD_SURFACE} />
         </div>
       ),
     },
