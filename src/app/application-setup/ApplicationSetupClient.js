@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { Badge, Button, Card, Input, Modal, Table, toastError, toastSuccess } from "@/shared/components/ui";
+import { Badge, Button, Card, Input, Modal, TableZ, toastError, toastSuccess } from "@/shared/components/ui";
 import {
   getApplicationDescription,
   getApplicationDisplayName,
@@ -1548,7 +1548,7 @@ export default function ApplicationSetupClient({
       <div className="row g-3 align-items-start">
         <div className="col-12 col-xl-6">
           <Card title="Applications" subtitle="Drag the grip icon in Actions to reorder applications.">
-            <Table
+            <TableZ
               columns={applicationColumns}
               data={decoratedApplications}
               rowIdKey="app_id"
@@ -1568,7 +1568,7 @@ export default function ApplicationSetupClient({
             subtitle={selectedApp ? "Application-scoped roles" : "Click an application row to view its roles."}
           >
             {selectedApp ? (
-              <Table
+              <TableZ
                 columns={roleColumns}
                 data={decoratedSelectedAppRoles}
                 rowIdKey="role_id"

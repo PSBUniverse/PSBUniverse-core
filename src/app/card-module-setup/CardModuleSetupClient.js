@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { Badge, Button, Card, Input, Modal, Table, toastError, toastSuccess } from "@/shared/components/ui";
+import { Badge, Button, Card, Input, Modal, TableZ, toastError, toastSuccess } from "@/shared/components/ui";
 import {
   getCardGroupDescription,
   getCardGroupDisplayName,
@@ -1924,7 +1924,7 @@ export default function CardModuleSetupClient({
       <div className="row g-3 align-items-start">
         <div className="col-12 col-xl-5">
           <Card title="Card Groups" subtitle="Drag the grip icon in Actions to reorder groups.">
-            <Table
+            <TableZ
               columns={groupColumns}
               data={decoratedGroups}
               rowIdKey="group_id"
@@ -1944,7 +1944,7 @@ export default function CardModuleSetupClient({
             subtitle={selectedGroup ? "Drag rows to reorder cards within the group" : "Click a card group row to view its cards."}
           >
             {selectedGroup ? (
-              <Table
+              <TableZ
                 columns={cardColumns}
                 data={decoratedSelectedGroupCards}
                 rowIdKey="card_id"

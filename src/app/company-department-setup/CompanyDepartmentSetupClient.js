@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { Badge, Button, Card, Input, Modal, Table, toastError, toastSuccess } from "@/shared/components/ui";
+import { Badge, Button, Card, Input, Modal, TableZ, toastError, toastSuccess } from "@/shared/components/ui";
 import {
   getCompanyDisplayName,
   getCompanyEmail,
@@ -1591,7 +1591,7 @@ export default function CompanyDepartmentSetupClient({
       <div className="row g-3 align-items-start">
         <div className="col-12 col-xl-6">
           <Card title="Companies" subtitle="Master company records.">
-            <Table
+            <TableZ
               columns={companyColumns}
               data={decoratedCompanies}
               rowIdKey="comp_id"
@@ -1609,7 +1609,7 @@ export default function CompanyDepartmentSetupClient({
             subtitle={selectedCompany ? "Company-scoped departments" : "Click a company row to view its departments."}
           >
             {selectedCompany ? (
-              <Table
+              <TableZ
                 columns={departmentColumns}
                 data={decoratedDepartments}
                 rowIdKey="dept_id"

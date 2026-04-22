@@ -1,6 +1,6 @@
 "use client";
 
-import { Card, Table } from "@/shared/components/ui";
+import { Card, TableZ } from "@/shared/components/ui";
 import { useDataTableModuleController } from "@/app/examples/data-table/useDataTableModuleController";
 
 export default function DataTableExampleModule({ userScope }) {
@@ -28,7 +28,7 @@ export default function DataTableExampleModule({ userScope }) {
 
         {errorText ? <p className="text-danger mb-3">{errorText}</p> : null}
 
-        <Table
+        <TableZ
           data={rows}
           columns={columns}
           state={tableState}

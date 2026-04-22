@@ -191,7 +191,7 @@ function validateTableProps({
   });
 }
 
-export default function Table({
+export default function TableZ({
   data = [],
   columns = [],
   rowIdKey = "id",

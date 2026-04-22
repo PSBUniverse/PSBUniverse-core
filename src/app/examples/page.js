@@ -9,7 +9,7 @@ import {
   Input,
   Modal,
   SearchBar,
-  Table,
+  TableZ,
   TABLE_FILTER_TYPES,
   createFilterConfig,
   toastError,
@@ -61,11 +61,11 @@ const TABLE_SOURCE_ROWS = [
 // Snippets
 // ---------------------------------------------------------------------------
 
-const SNIPPET_IMPORT = `import { Table, Button, Input, Modal, Badge, SearchBar, Dropdown, toastSuccess } from "@/shared/components/ui";`;
+const SNIPPET_IMPORT = `import { TableZ, Button, Input, Modal, Badge, SearchBar, Dropdown, toastSuccess } from "@/shared/components/ui";`;
 
-const SNIPPET_TABLE_BASIC = `import { Table } from "@/shared/components/ui";
+const SNIPPET_TABLE_BASIC = `import { TableZ } from "@/shared/components/ui";
 
-<Table
+<TableZ
   data={rows}
   columns={columns}
   state={tableState}
@@ -96,7 +96,7 @@ const SNIPPET_TABLE_DATABIND = `// ─── FULL END-TO-END: Database → API �
 //   3. Service – business logic, validation, orchestration
 //   4. Hook    – calls service, returns data for the page
 //   5. API     – Next.js route handler (POST /api/card-module-setup/cards)
-//   6. Client  – fetches API, binds data to <Table />
+//   6. Client  – fetches API, binds data to <TableZ />
 
 // ── 1. MODEL ── src/modules/card-module-setup/model/card.model.js
 export function isCardActive(card) {
@@ -188,7 +188,7 @@ export default async function CardModuleSetupPage() {
   return <CardModuleSetupClient seedCardGroups={cardGroups} seedCards={cards} />;
 }
 
-// ── 7. CLIENT COMPONENT ── binds data to Table
+// ── 7. CLIENT COMPONENT ── binds data to TableZ
 const selectedGroupCards = useMemo(() =>
   allCards
     .filter((card) => card.group_id === selectedGroup?.group_id)
@@ -210,7 +210,7 @@ const cardColumns = useMemo(() => [
   },
 ], []);
 
-<Table
+<TableZ
   columns={cardColumns}
   data={selectedGroupCards}
   rowIdKey="card_id"
@@ -356,7 +356,7 @@ const SNIPPET_TABLE_ONCHANGE = `// onChange receives ALL table events through a 
 //
 // Real example from: useDataTableModuleController.js (Data Table Example)
 //
-// Event types emitted by <Table />:
+// Event types emitted by <TableZ />:
 //   "search"           → user typed in the search bar
 //   "filters"          → user changed a filter dropdown / date range
 //   "sorting"          → user clicked a sortable column header
@@ -672,7 +672,7 @@ const loadData = useCallback(async () => {
   }
 }, [tableState.filters, tableState.sorting, tableState.pagination.page, tableState.pagination.pageSize]);
 
-// The SearchBar is built into <Table /> via searchPlaceholder prop,
+// The SearchBar is built into <TableZ /> via searchPlaceholder prop,
 // OR you can use it standalone:
 <SearchBar
   value={search}
@@ -820,7 +820,7 @@ const SNIPPET_CARD_SURFACE = `import { Card } from "@/shared/components/ui";
     </Button>
   }
 >
-  <Table
+  <TableZ
     columns={groupColumns}
     data={decoratedAppGroups}
     rowIdKey="group_id"
@@ -2157,7 +2157,7 @@ function PlaygroundTab() {
       title: "Data Table (with Filters & Actions)",
       content: (
         <div className={styles.playBody}>
-          <Table
+          <TableZ
             data={tableRows}
             columns={tableColumns}
             state={tableViewState}
@@ -2420,7 +2420,7 @@ function BonusRealWorldTable() {
   return (
     <div className={styles.playBody}>
       <p className={styles.playLabel}>Employee access requests awaiting review. Approve or reject from row actions.</p>
-      <Table
+      <TableZ
         data={tableRows}
         columns={columns}
         state={tableViewState}
@@ -2943,12 +2943,768 @@ function ReferenceTab() {
 }
 
 // ---------------------------------------------------------------------------
+// TableX Tab — The Easy Table (for jr devs)
+// ---------------------------------------------------------------------------
+
+const TABLEX_SNIPPET_BASIC = `import { TableX } from "@/shared/components/ui";
+
+// That's it. Just tell it which table and which columns.
+// It fetches the data, sorts, filters, paginates — all automatic.
+
+<TableX
+  source="psb_s_user"
+  columns={["user_id", "first_name", "last_name", "email"]}
+/>`;
+
+const TABLEX_SNIPPET_COLUMNS_STRING = `// SIMPLE WAY: just list the column names as strings
+// Labels are created automatically: "first_name" becomes "First Name"
+
+<TableX
+  source="psb_s_user"
+  columns={["user_id", "first_name", "last_name", "email"]}
+/>`;
+
+const TABLEX_SNIPPET_COLUMNS_OBJECT = `// ADVANCED WAY: use objects when you need custom labels or rendering
+
+<TableX
+  source="psb_s_user"
+  columns={[
+    "user_id",
+    "first_name",
+    { key: "status", label: "User Status", sortable: true },
+    {
+      key: "is_active",
+      label: "Active",
+      render: (row) => (
+        <Badge bg={row.is_active ? "success" : "secondary"}>
+          {row.is_active ? "Yes" : "No"}
+        </Badge>
+      ),
+    },
+  ]}
+/>
+
+// You can mix strings and objects in the same array!`;
+
+const TABLEX_SNIPPET_FILTERS = `// Filters let users narrow down the table rows.
+// Each filter needs: key, type
+// For "select" filters, also add: source, display
+
+const userFilters = [
+  // SELECT filter — dropdown loaded from another table
+  {
+    key: "status_id",         // column in your table to filter on
+    type: "select",           // makes a dropdown
+    source: "psb_s_status",   // which table to load options from
+    display: "sts_name",      // which column to show as the label
+  },
+
+  // TEXT filter — free text search on that column
+  {
+    key: "email",
+    type: "text",
+  },
+
+  // DATERANGE filter — pick a start and end date
+  {
+    key: "created_at",
+    type: "daterange",
+    label: "Created Date",    // optional custom label
+  },
+];
+
+<TableX
+  source="psb_s_user"
+  columns={["user_id", "first_name", "email", "status_id", "created_at"]}
+  filters={userFilters}
+/>`;
+
+const TABLEX_SNIPPET_ACTIONS = `// Actions show buttons on each row (Edit, Delete, etc.)
+// Each action needs: key, label, type, onClick
+
+const userActions = [
+  {
+    key: "edit",
+    label: "Edit",
+    type: "primary",            // blue button
+    icon: "pencil-square",      // Bootstrap icon (without "bi-")
+    onClick: (row) => {
+      console.log("Edit user:", row);
+    },
+  },
+  {
+    key: "deactivate",
+    label: "Deactivate",
+    type: "danger",             // red button
+    confirm: true,              // shows "Are you sure?" popup
+    confirmMessage: (row) => \`Deactivate \${row.first_name}?\`,
+    onClick: (row) => {
+      console.log("Deactivate user:", row);
+    },
+  },
+];
+
+<TableX
+  source="psb_s_user"
+  columns={["user_id", "first_name", "last_name"]}
+  actions={userActions}
+/>
+
+// Action types:
+//   "primary"   → blue button  (for: Edit, View, Preview)
+//   "secondary" → gray button  (for: Duplicate, Export)
+//   "danger"    → red button   (for: Delete, Deactivate)`;
+
+const TABLEX_SNIPPET_FEATURES = `// Features let you turn table powers on or off.
+// By default, everything is ON except drag and batch.
+
+const userFeatures = {
+  sorting: true,      // click column header to sort (ON by default)
+  filtering: true,    // show filter bar (ON by default)
+  pagination: true,   // show page controls (ON by default)
+  resizing: true,     // drag to resize columns (ON by default)
+  drag: false,        // drag rows to reorder (OFF by default)
+  batch: false,       // batch edit mode (OFF by default)
+};
+
+<TableX
+  source="psb_s_user"
+  columns={["user_id", "first_name"]}
+  features={userFeatures}
+/>
+
+// Want a read-only table? Just turn everything off:
+<TableX
+  source="psb_s_user"
+  columns={["user_id", "first_name"]}
+  features={{ sorting: false, filtering: false }}
+/>`;
+
+const TABLEX_SNIPPET_FULL = `import { TableX } from "@/shared/components/ui";
+
+// FULL EXAMPLE — everything together
+
+const userFilters = [
+  { key: "status_id", type: "select", source: "psb_s_status", display: "sts_name" },
+  { key: "created_at", type: "daterange", label: "Created Date" },
+];
+
+const userActions = [
+  {
+    key: "edit",
+    label: "Edit",
+    type: "primary",
+    icon: "pencil-square",
+    onClick: (row) => openEditDialog(row),
+  },
+  {
+    key: "delete",
+    label: "Delete",
+    type: "danger",
+    confirm: true,
+    confirmMessage: (row) => \`Delete \${row.first_name} \${row.last_name}?\`,
+    onClick: (row) => deleteUser(row.user_id),
+  },
+];
+
+<TableX
+  source="psb_s_user"
+  columns={["user_id", "first_name", "last_name", "email", "status_id", "created_at"]}
+  filters={userFilters}
+  actions={userActions}
+  features={{ sorting: true, filtering: true }}
+/>`;
+
+const TABLEX_SNIPPET_EXPORT = `// Export is built-in. You don't write any code for it.
+// Users can click the "Customize Table" button (side panel),
+// then click "Export CSV" or "Export Excel".
+//
+// What gets exported:
+//   - Only visible columns
+//   - Respects current filters and sorting
+//   - Column headers use the labels you defined
+//
+// That's it. Nothing to configure.`;
+
+function TableXTab() {
+  return (
+    <div className={styles.tabContent}>
+      <div className={styles.refBody}>
+        <h2 className={styles.stepHeading}>TableX — The Easy Table</h2>
+        <p className={styles.stepNote}>
+          TableX is for everyday use. Give it a table name and column list — it does everything else.
+          No hooks. No state. No fetch logic. Just props.
+        </p>
+      </div>
+
+      <Accordion items={[
+        {
+          key: "tablex-basic",
+          title: "1. Basic Table (just show data)",
+          content: (
+            <div className={styles.refBody}>
+              <p className={styles.stepNote}>
+                The simplest possible table. Just two props: <code>source</code> (your database table name)
+                and <code>columns</code> (which columns to show). It loads the data automatically.
+              </p>
+              <Snippet title="Code" code={TABLEX_SNIPPET_BASIC} />
+              <div className={styles.propGrid}>
+                <RefPropRow prop="source" required type="string" desc="The database table name (e.g. psb_s_user)" />
+                <RefPropRow prop="columns" required type="string[]" desc="Which columns to show. Order matters — left to right." />
+              </div>
+            </div>
+          ),
+        },
+        {
+          key: "tablex-columns",
+          title: "2. Columns — Strings vs Objects",
+          content: (
+            <div className={styles.refBody}>
+              <p className={styles.stepNote}>
+                You can pass column names as simple strings (easy) or as objects (when you need custom labels or cell rendering).
+              </p>
+              <Snippet title="Simple — Just Strings" code={TABLEX_SNIPPET_COLUMNS_STRING} />
+              <Snippet title="Advanced — Objects" code={TABLEX_SNIPPET_COLUMNS_OBJECT} />
+              <div className={styles.ruleGrid}>
+                <div className={styles.ruleCol}>
+                  <p className={styles.ruleHeading}>String Column</p>
+                  <ul className={styles.ruleList}>
+                    <li>Just the field name</li>
+                    <li>Label is auto-generated</li>
+                    <li>Sorting is on by default</li>
+                  </ul>
+                </div>
+                <div className={styles.ruleCol}>
+                  <p className={styles.ruleHeading}>Object Column</p>
+                  <ul className={styles.ruleList}>
+                    <li>Custom label, width, render</li>
+                    <li>Use render for Badges, icons, etc.</li>
+                    <li>Mix with strings in same array</li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+          ),
+        },
+        {
+          key: "tablex-filters",
+          title: "3. Filters (dropdown, text, date range)",
+          content: (
+            <div className={styles.refBody}>
+              <p className={styles.stepNote}>
+                Filters appear above the table. Users can narrow down rows.
+                For dropdowns, TableX loads the options from the database automatically.
+              </p>
+              <Snippet title="Code" code={TABLEX_SNIPPET_FILTERS} />
+              <div className={styles.propGrid}>
+                <RefPropRow prop="key" required type="string" desc="The column name in YOUR table to filter on" />
+                <RefPropRow prop="type" required type="string" desc="select | text | date | daterange" />
+                <RefPropRow prop="source" required={false} type="string" desc="For select: which table to load dropdown options from" />
+                <RefPropRow prop="display" required={false} type="string" desc="For select: which column to show as the label" />
+                <RefPropRow prop="label" required={false} type="string" desc="Custom label (default: auto from key name)" />
+              </div>
+            </div>
+          ),
+        },
+        {
+          key: "tablex-actions",
+          title: "4. Row Actions (Edit, Delete, etc.)",
+          content: (
+            <div className={styles.refBody}>
+              <p className={styles.stepNote}>
+                Actions add buttons to each row. You decide what each button does.
+              </p>
+              <Snippet title="Code" code={TABLEX_SNIPPET_ACTIONS} />
+              <div className={styles.propGrid}>
+                <RefPropRow prop="key" required type="string" desc="Unique name for this action" />
+                <RefPropRow prop="label" required type="string" desc="Button text" />
+                <RefPropRow prop="type" required type="string" desc="primary | secondary | danger" />
+                <RefPropRow prop="onClick" required type="function" desc="What happens when clicked. Receives the row data." />
+                <RefPropRow prop="icon" required={false} type="string" desc="Bootstrap icon name (without bi- prefix)" />
+                <RefPropRow prop="confirm" required={false} type="boolean" desc="Show confirmation popup before running onClick" />
+                <RefPropRow prop="confirmMessage" required={false} type="function" desc="Custom confirmation text. Receives row." />
+                <RefPropRow prop="visible" required={false} type="function" desc="Show/hide per row. (row) => boolean" />
+                <RefPropRow prop="disabled" required={false} type="function" desc="Enable/disable per row. (row) => boolean" />
+              </div>
+            </div>
+          ),
+        },
+        {
+          key: "tablex-features",
+          title: "5. Features (turn things on/off)",
+          content: (
+            <div className={styles.refBody}>
+              <p className={styles.stepNote}>
+                Features control what the table can do. Everything is ON by default except drag and batch.
+              </p>
+              <Snippet title="Code" code={TABLEX_SNIPPET_FEATURES} />
+              <div className={styles.propGrid}>
+                <RefPropRow prop="sorting" required={false} type="boolean" desc="Click column headers to sort. Default: true" />
+                <RefPropRow prop="filtering" required={false} type="boolean" desc="Show filter bar. Default: true" />
+                <RefPropRow prop="pagination" required={false} type="boolean" desc="Show page controls. Default: true" />
+                <RefPropRow prop="resizing" required={false} type="boolean" desc="Drag to resize columns. Default: true" />
+                <RefPropRow prop="drag" required={false} type="boolean" desc="Drag rows to reorder. Default: false" />
+                <RefPropRow prop="batch" required={false} type="boolean" desc="Batch edit mode. Default: false" />
+              </div>
+            </div>
+          ),
+        },
+        {
+          key: "tablex-export",
+          title: "6. Export (CSV / Excel)",
+          content: (
+            <div className={styles.refBody}>
+              <p className={styles.stepNote}>
+                Export is built-in. No extra code needed. Users click the side panel button to download.
+              </p>
+              <Snippet title="How It Works" code={TABLEX_SNIPPET_EXPORT} />
+            </div>
+          ),
+        },
+        {
+          key: "tablex-full",
+          title: "7. Full Example (everything together)",
+          content: (
+            <div className={styles.refBody}>
+              <p className={styles.stepNote}>
+                Here is a complete, real-world example with columns, filters, actions, and features all in one.
+              </p>
+              <Snippet title="Full Code" code={TABLEX_SNIPPET_FULL} />
+            </div>
+          ),
+        },
+        {
+          key: "tablex-props",
+          title: "8. All Props (quick reference)",
+          content: (
+            <div className={styles.refBody}>
+              <p className={styles.stepNote}>Every prop TableX accepts, in one place.</p>
+              <div className={styles.propGrid}>
+                <RefPropRow prop="source" required type="string" desc="Database table name" />
+                <RefPropRow prop="columns" required type="(string | object)[]" desc="Column names or column config objects" />
+                <RefPropRow prop="filters" required={false} type="object[]" desc="Filter definitions array" />
+                <RefPropRow prop="features" required={false} type="object" desc="Feature toggles (sorting, filtering, etc.)" />
+                <RefPropRow prop="actions" required={false} type="object[]" desc="Row action buttons" />
+              </div>
+            </div>
+          ),
+        },
+      ]} />
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Table Tab — The Power Table (for senior devs)
+// ---------------------------------------------------------------------------
+
+const TABLE_SNIPPET_UNCONTROLLED = `import { TableZ } from "@/shared/components/ui";
+
+// UNCONTROLLED MODE — TableZ handles sorting, filtering, pagination internally.
+// You just pass data and columns. Good for small, local datasets.
+
+const columns = [
+  { key: "group_name",    label: "Group Name",  sortable: true, width: 220 },
+  { key: "group_desc",    label: "Description", sortable: false, width: 250 },
+  {
+    key: "is_active",
+    label: "Active",
+    width: 100,
+    render: (row) => (
+      <Badge bg={row.is_active ? "success" : "secondary"}>
+        {row.is_active ? "Yes" : "No"}
+      </Badge>
+    ),
+  },
+];
+
+const actions = [
+  {
+    key: "edit",
+    label: "Edit",
+    type: "primary",
+    icon: "pencil-square",
+    onClick: (row) => openEditDialog(row),
+  },
+];
+
+<TableZ
+  data={groups}
+  columns={columns}
+  rowIdKey="group_id"
+  actions={actions}
+  emptyMessage="No groups found."
+/>`;
+
+const TABLE_SNIPPET_CONTROLLED = `import { TableZ, createFilterConfig, TABLE_FILTER_TYPES } from "@/shared/components/ui";
+
+// CONTROLLED MODE — You manage the state. TableZ tells you what changed.
+// Use this when you need server-side sorting, filtering, pagination.
+// You must pass: state + onChange
+
+const [tableState, setTableState] = useState({
+  filters: {},
+  sorting: { key: "created_at", direction: "desc" },
+  pagination: { page: 1, pageSize: 50, total: 0 },
+  columnVisibility: {},
+  columnSizing: {},
+});
+
+const filterConfig = createFilterConfig([
+  { key: "status", label: "Status", type: TABLE_FILTER_TYPES.SELECT, options: statusOptions },
+  { key: "created_at", label: "Created", type: TABLE_FILTER_TYPES.DATERANGE },
+]);
+
+function handleTableChange(event) {
+  switch (event.type) {
+    case "search":
+      setTableState(prev => ({
+        ...prev,
+        filters: { ...prev.filters, search: event.value },
+        pagination: { ...prev.pagination, page: 1 },
+      }));
+      break;
+    case "filters":
+      setTableState(prev => ({ ...prev, filters: event.filters, pagination: { ...prev.pagination, page: 1 } }));
+      break;
+    case "sorting":
+      setTableState(prev => ({ ...prev, sorting: event.sorting, pagination: { ...prev.pagination, page: 1 } }));
+      break;
+    case "pagination":
+      setTableState(prev => ({ ...prev, pagination: { ...prev.pagination, ...event.pagination } }));
+      break;
+    case "action":
+      event.action.onClick(event.row);
+      break;
+  }
+}
+
+<TableZ
+  data={rows}
+  columns={columns}
+  state={tableState}
+  filterConfig={filterConfig}
+  actions={actions}
+  loading={loading}
+  onChange={handleTableChange}
+/>`;
+
+const TABLE_SNIPPET_DRAGGABLE = `// DRAG & DROP — let users reorder rows by dragging.
+// The table auto-updates the "order" field on each row.
+// Use with onReorder to save the new order.
+
+<TableZ
+  data={groups}
+  columns={groupColumns}
+  rowIdKey="group_id"
+  actions={groupActions}
+  draggable={true}
+  onReorder={(reorderedRows) => {
+    // reorderedRows = same data, but with updated order values
+    setGroups(reorderedRows);
+    saveSortOrder(reorderedRows);
+  }}
+/>`;
+
+const TABLE_SNIPPET_BATCH = `// BATCH EDIT — track created, updated, and deleted rows.
+// Table highlights changed rows. You save all changes at once.
+
+<TableZ
+  data={users}
+  columns={userColumns}
+  rowIdKey="user_id"
+  actions={userActions}
+  batchMode={true}
+  onBatchChange={(payload) => {
+    // payload = { created: [...], updated: [...], deleted: [...] }
+    // payload.hasPendingChanges = true if anything changed
+    setPendingChanges(payload);
+  }}
+  onBatchSave={async (payload) => {
+    await saveBatchToServer(payload);
+  }}
+/>`;
+
+const TABLE_SNIPPET_MASTERDETAIL = `// MASTER-DETAIL PATTERN — click a row in the left table,
+// show related data in the right table.
+// Used in: Application Setup, Card Module Setup, Company Department Setup
+
+const [selectedCompany, setSelectedCompany] = useState(null);
+
+// Filter departments by selected company
+const departments = allDepartments.filter(
+  (d) => d.comp_id === selectedCompany?.comp_id
+);
+
+// LEFT TABLE — Companies (master)
+<TableZ
+  data={companies}
+  columns={companyColumns}
+  rowIdKey="comp_id"
+  selectedRowId={selectedCompany?.comp_id}
+  onRowClick={(row) => setSelectedCompany(row)}
+  actions={companyActions}
+/>
+
+// RIGHT TABLE — Departments (detail)
+<TableZ
+  data={departments}
+  columns={departmentColumns}
+  rowIdKey="dept_id"
+  actions={departmentActions}
+  emptyMessage={
+    selectedCompany
+      ? "No departments for this company."
+      : "Select a company first."
+  }
+/>`;
+
+const TABLE_SNIPPET_COLUMNS_FULL = `// COLUMN OPTIONS — full list of what you can set on a column
+
+const columns = [
+  {
+    key: "employee_code",     // (required) field name from your data
+    label: "Employee Code",   // (required) column header text
+    sortable: true,           // click header to sort by this column
+    width: 150,               // starting pixel width
+    minWidth: 80,             // won't shrink below this
+    defaultVisible: true,     // set false to hide on first load (still in panel)
+    render: (row) => (        // custom cell content
+      <span style={{ fontWeight: 700 }}>{row.employee_code}</span>
+    ),
+  },
+];`;
+
+const TABLE_SNIPPET_ACTIONS_FULL = `// ACTION OPTIONS — full list of what you can set on an action
+
+const actions = [
+  {
+    key: "edit",                    // (required) unique name
+    label: "Edit",                  // (required) button text
+    type: "primary",                // (required) primary | secondary | danger
+    icon: "pencil-square",          // Bootstrap icon (without "bi-")
+    onClick: (row) => {},           // (required) what happens on click
+    visible: (row) => true,         // show/hide per row
+    disabled: (row) => false,       // enable/disable per row
+    confirm: false,                 // show "Are you sure?" popup
+    confirmMessage: (row) =>        // custom confirmation text
+      \`Delete \${row.name}?\`,
+  },
+];`;
+
+const TABLE_SNIPPET_EVENTS = `// TABLE EVENTS — what event.type values you will receive in onChange (TableZ)
+
+// "search"           — user typed in the search bar
+//                      event.value = the search text
+//
+// "filters"          — user changed a filter (dropdown, date, etc.)
+//                      event.filters = { filterKey: filterValue }
+//
+// "sorting"          — user clicked a sortable column header
+//                      event.sorting = { key: "column", direction: "asc"|"desc" }
+//
+// "pagination"       — user changed page or page size
+//                      event.pagination = { page: 2, pageSize: 50 }
+//
+// "action"           — user clicked a row action button
+//                      event.action = the action config, event.row = the row data
+//
+// "export"           — user clicked CSV or Excel export
+//                      event.format = "csv"|"excel", event.context = { filters, sorting, ... }
+//
+// "columnVisibility" — user toggled a column in the Customize panel
+//                      event.columnVisibility = { columnKey: true|false }
+//
+// "columnResize"     — user resized a column by dragging
+//                      event.columnSizing = { columnKey: newWidth }`;
+
+function TableZTab() {
+  return (
+    <div className={styles.tabContent}>
+      <div className={styles.refBody}>
+        <h2 className={styles.stepHeading}>TableZ — The Power Table</h2>
+        <p className={styles.stepNote}>
+          TableZ is the full engine. Use it when you need complete control — server-side state,
+          drag-and-drop, batch editing, master-detail, or custom rendering.
+          For simple tables, use TableX instead.
+        </p>
+      </div>
+
+      <Accordion items={[
+        {
+          key: "table-uncontrolled",
+          title: "1. Uncontrolled Mode (easy, local data)",
+          content: (
+            <div className={styles.refBody}>
+              <p className={styles.stepNote}>
+                Pass <code>data</code> and <code>columns</code>. TableZ handles sorting, filtering, and pagination inside itself.
+                Best for small datasets that are already loaded.
+              </p>
+              <Snippet title="Code" code={TABLE_SNIPPET_UNCONTROLLED} />
+            </div>
+          ),
+        },
+        {
+          key: "table-controlled",
+          title: "2. Controlled Mode (server-driven)",
+          content: (
+            <div className={styles.refBody}>
+              <p className={styles.stepNote}>
+                Pass <code>state</code> and <code>onChange</code>. You manage the state, fetch data from the server,
+                and update the state when events come in. Use for large datasets.
+              </p>
+              <Snippet title="Code" code={TABLE_SNIPPET_CONTROLLED} />
+            </div>
+          ),
+        },
+        {
+          key: "table-masterdetail",
+          title: "3. Master-Detail (click row → show related data)",
+          content: (
+            <div className={styles.refBody}>
+              <p className={styles.stepNote}>
+                Two tables side by side. Click a row in the left table, the right table shows related rows.
+                Used in Application Setup, Card Module Setup, Company Department Setup.
+              </p>
+              <Snippet title="Code" code={TABLE_SNIPPET_MASTERDETAIL} />
+            </div>
+          ),
+        },
+        {
+          key: "table-draggable",
+          title: "4. Drag & Drop Reorder",
+          content: (
+            <div className={styles.refBody}>
+              <p className={styles.stepNote}>
+                Let users drag rows to reorder them. The table updates the order field automatically.
+              </p>
+              <Snippet title="Code" code={TABLE_SNIPPET_DRAGGABLE} />
+            </div>
+          ),
+        },
+        {
+          key: "table-batch",
+          title: "5. Batch Editing",
+          content: (
+            <div className={styles.refBody}>
+              <p className={styles.stepNote}>
+                Track row changes (create, update, delete) and save them all at once.
+                Changed rows get highlighted automatically.
+              </p>
+              <Snippet title="Code" code={TABLE_SNIPPET_BATCH} />
+            </div>
+          ),
+        },
+        {
+          key: "table-columns-ref",
+          title: "6. Column Options (full reference)",
+          content: (
+            <div className={styles.refBody}>
+              <p className={styles.stepNote}>Every option you can set on a column.</p>
+              <Snippet title="Code" code={TABLE_SNIPPET_COLUMNS_FULL} />
+              <div className={styles.propGrid}>
+                <RefPropRow prop="key" required type="string" desc="Field name from your row data" />
+                <RefPropRow prop="label" required type="string" desc="Column header text" />
+                <RefPropRow prop="sortable" required={false} type="boolean" desc="Enable click-to-sort. Default: false" />
+                <RefPropRow prop="width" required={false} type="number" desc="Starting pixel width" />
+                <RefPropRow prop="minWidth" required={false} type="number" desc="Minimum width when resizing" />
+                <RefPropRow prop="defaultVisible" required={false} type="boolean" desc="Set false to hide initially" />
+                <RefPropRow prop="render" required={false} type="function" desc="Custom cell renderer: (row) => ReactNode" />
+              </div>
+            </div>
+          ),
+        },
+        {
+          key: "table-actions-ref",
+          title: "7. Action Options (full reference)",
+          content: (
+            <div className={styles.refBody}>
+              <p className={styles.stepNote}>Every option you can set on a row action.</p>
+              <Snippet title="Code" code={TABLE_SNIPPET_ACTIONS_FULL} />
+            </div>
+          ),
+        },
+        {
+          key: "table-events-ref",
+          title: "8. Table Events (what onChange receives)",
+          content: (
+            <div className={styles.refBody}>
+              <p className={styles.stepNote}>All the event types the table emits through onChange.</p>
+              <Snippet title="Event Types" code={TABLE_SNIPPET_EVENTS} />
+            </div>
+          ),
+        },
+        {
+          key: "table-props-ref",
+          title: "9. All Props (quick reference)",
+          content: (
+            <div className={styles.refBody}>
+              <p className={styles.stepNote}>Every prop the TableZ component accepts.</p>
+              <div className={styles.propGrid}>
+                <RefPropRow prop="data" required type="array" desc="Array of row objects" />
+                <RefPropRow prop="columns" required type="object[]" desc="Column config objects" />
+                <RefPropRow prop="rowIdKey" required={false} type="string" desc="Unique ID field per row. Default: id" />
+                <RefPropRow prop="actions" required={false} type="object[]" desc="Row action buttons" />
+                <RefPropRow prop="state" required={false} type="object" desc="Controlled state (turns on controlled mode)" />
+                <RefPropRow prop="onChange" required={false} type="function" desc="Event handler (required with state)" />
+                <RefPropRow prop="filterConfig" required={false} type="object[]" desc="Filter definitions (controlled mode)" />
+                <RefPropRow prop="loading" required={false} type="boolean" desc="Show loading spinner" />
+                <RefPropRow prop="selectedRowId" required={false} type="string | number" desc="Highlight a row (master-detail)" />
+                <RefPropRow prop="onRowClick" required={false} type="function" desc="Click handler for row selection" />
+                <RefPropRow prop="draggable" required={false} type="boolean" desc="Enable drag-and-drop reorder" />
+                <RefPropRow prop="onReorder" required={false} type="function" desc="Callback with reordered rows" />
+                <RefPropRow prop="batchMode" required={false} type="boolean" desc="Enable batch editing" />
+                <RefPropRow prop="onBatchChange" required={false} type="function" desc="Callback with batch payload" />
+                <RefPropRow prop="onBatchSave" required={false} type="function" desc="Callback to save batch" />
+                <RefPropRow prop="emptyMessage" required={false} type="string" desc="Message when no rows" />
+                <RefPropRow prop="searchPlaceholder" required={false} type="string" desc="Search bar placeholder text" />
+              </div>
+            </div>
+          ),
+        },
+        {
+          key: "table-when-to-use",
+          title: "10. When to Use TableZ vs TableX",
+          content: (
+            <div className={styles.refBody}>
+              <div className={styles.ruleGrid}>
+                <div className={styles.ruleCol}>
+                  <p className={styles.ruleHeading}>Use TableX When</p>
+                  <ul className={styles.ruleList}>
+                    <li>You just need to show data from a database table</li>
+                    <li>You want filters, sorting, pagination to just work</li>
+                    <li>You don not need drag, batch, or master-detail</li>
+                    <li>You want the simplest possible code</li>
+                  </ul>
+                </div>
+                <div className={styles.ruleCol}>
+                  <p className={styles.ruleHeading}>Use TableZ When</p>
+                  <ul className={styles.ruleList}>
+                    <li>You need full control over state and data fetching</li>
+                    <li>You need drag-and-drop reordering</li>
+                    <li>You need batch editing (create/update/delete)</li>
+                    <li>You need master-detail (click row → show related)</li>
+                    <li>You need custom server-side logic</li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+          ),
+        },
+      ]} />
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Root
 // ---------------------------------------------------------------------------
 
 const TABS = [
   { id: "quick-start", label: "Quick Start" },
   { id: "playground",  label: "Playground"  },
+  { id: "tablex",      label: "TableX"      },
+  { id: "tablez",      label: "TableZ"      },
   { id: "reference",   label: "Reference"   },
 ];
 
@@ -2981,6 +3737,8 @@ export default function SharedUiReferencePage() {
 
       {activeTab === "quick-start" && <QuickStartTab />}
       {activeTab === "playground"  && <PlaygroundTab />}
+      {activeTab === "tablex"      && <TableXTab />}
+      {activeTab === "tablez"      && <TableZTab />}
       {activeTab === "reference"   && <ReferenceTab  />}
     </div>
   );

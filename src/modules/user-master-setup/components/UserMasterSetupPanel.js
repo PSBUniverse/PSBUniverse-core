@@ -7,7 +7,7 @@ import {
   Card,
   Input,
   Modal,
-  Table,
+  TableZ,
   toastError,
   toastInfo,
   toastSuccess,
@@ -1531,7 +1531,7 @@ export function UserMasterSetupPanel({ users = [], totalUsers = 0 }) {
           </div>
         ) : null}
 
-        <Table
+        <TableZ
           className="umsp-access-table"
           columns={accessColumns}
           data={accessRows}
@@ -1653,7 +1653,7 @@ export function UserMasterSetupPanel({ users = [], totalUsers = 0 }) {
         </div>
 
         <Card>
-          <Table
+          <TableZ
             columns={userColumns}
             data={tableRows}
             rowIdKey="id"
