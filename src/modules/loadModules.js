@@ -38,29 +38,39 @@ export async function loadModules() {
   const modulesDir = path.join(process.cwd(), "src", "modules");
   const entries = await readModuleEntries(modulesDir);
 
-  for (const entry of entries) {
-    if (!entry.isDirectory()) {
-      continue;
+  async function scanDirectory(dir, dirEntries) {
+    for (const entry of dirEntries) {
+      if (!entry.isDirectory()) {
+        continue;
+      }
+
+      const modulePath = await resolveModulePath(dir, entry.name);
+
+      if (!modulePath) {
+        // Check if the directory contains sub-modules (e.g. admin/)
+        const subDir = path.join(dir, entry.name);
+        const subEntries = await readModuleEntries(subDir);
+        if (subEntries.length > 0) {
+          await scanDirectory(subDir, subEntries);
+        }
+        continue;
+      }
+
+      const moduleUrl = createModuleUrl(modulePath);
+      const importedModule = await import(/* webpackIgnore: true */ moduleUrl.href);
+      const moduleDefinition = importedModule.default ?? importedModule;
+      const moduleKey = String(moduleDefinition?.key || entry.name);
+
+      if (seenModuleKeys.has(moduleKey)) {
+        continue;
+      }
+
+      seenModuleKeys.add(moduleKey);
+      modules.push(moduleDefinition);
     }
-
-    const modulePath = await resolveModulePath(modulesDir, entry.name);
-
-    if (!modulePath) {
-      continue;
-    }
-
-    const moduleUrl = createModuleUrl(modulePath);
-    const importedModule = await import(/* webpackIgnore: true */ moduleUrl.href);
-    const moduleDefinition = importedModule.default ?? importedModule;
-    const moduleKey = String(moduleDefinition?.key || entry.name);
-
-    if (seenModuleKeys.has(moduleKey)) {
-      continue;
-    }
-
-    seenModuleKeys.add(moduleKey);
-    modules.push(moduleDefinition);
   }
+
+  await scanDirectory(modulesDir, entries);
 
   return modules;
 }

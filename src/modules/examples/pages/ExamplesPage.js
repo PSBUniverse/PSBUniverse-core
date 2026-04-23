@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useCallback, useMemo, useState } from "react";
 import {
@@ -83,7 +83,7 @@ const SNIPPET_TABLE_STATE = `const [tableState, setTableState] = useState({
   columnSizing: {},
 });`;
 
-const SNIPPET_TABLE_DATABIND = `// ─── FULL END-TO-END: Database → API → Frontend → Table ───
+const SNIPPET_TABLE_DATABIND = `// --- FULL END-TO-END: Database ? API ? Frontend ? Table ---
 //
 // DATA SOURCE
 //   Table: psb_s_appcard (Supabase)
@@ -91,14 +91,14 @@ const SNIPPET_TABLE_DATABIND = `// ─── FULL END-TO-END: Database → API �
 //            route_path, icon, display_order, is_active
 //
 // LAYER STACK
-//   1. Model   – maps raw DB row → UI-friendly shape
+//   1. Model   – maps raw DB row ? UI-friendly shape
 //   2. Repo    – Supabase queries (ONLY layer that calls .from())
 //   3. Service – business logic, validation, orchestration
 //   4. Hook    – calls service, returns data for the page
-//   5. API     – Next.js route handler (POST /api/card-module-setup/cards)
+//   5. API     – Next.js route handler (POST /api/admin/card-module-setup/cards)
 //   6. Client  – fetches API, binds data to <TableZ />
 
-// ── 1. MODEL ── src/modules/card-module-setup/model/card.model.js
+// -- 1. MODEL -- src/modules/card-module-setup/model/card.model.js
 export function isCardActive(card) {
   if (card?.is_active === false || card?.is_active === 0) return false;
   const text = String(card?.is_active ?? "").trim().toLowerCase();
@@ -109,7 +109,7 @@ export function getCardDisplayName(card) {
   return card?.card_name || card?.name || "Unknown";
 }
 
-// ── 2. REPO ── src/modules/card-module-setup/repo/cards.repo.js
+// -- 2. REPO -- src/modules/card-module-setup/repo/cards.repo.js
 const TABLE = "psb_s_appcard";
 
 export async function fetchCardsByGroupId(supabase, groupId) {
@@ -134,7 +134,7 @@ export async function createCard(supabase, payload) {
   return data;
 }
 
-// ── 3. SERVICE ── src/modules/card-module-setup/services/cardModuleSetup.service.js
+// -- 3. SERVICE -- src/modules/card-module-setup/services/cardModuleSetup.service.js
 import { fetchCardsByGroupId, createCard } from "../repo/cards.repo.js";
 
 export async function getCardList(supabase) {
@@ -159,7 +159,7 @@ export async function createCardRecord(supabase, payload) {
   });
 }
 
-// ── 4. HOOK ── src/modules/card-module-setup/hooks/cardModuleSetupData.js
+// -- 4. HOOK -- src/modules/card-module-setup/hooks/cardModuleSetupData.js
 import { getSupabase } from "../utils/supabase.js";
 import { getCardModuleSetupViewModel } from "../services/cardModuleSetup.service.js";
 
@@ -168,10 +168,10 @@ export async function loadCardModuleSetupData() {
   return getCardModuleSetupViewModel(supabase);
 }
 
-// ── 5. API ROUTE ── src/app/api/card-module-setup/cards/route.js
+// -- 5. API ROUTE -- src/app/api/admin/card-module-setup/cards/route.js
 import { NextResponse } from "next/server";
-import { getSupabase } from "@/modules/card-module-setup/utils/supabase.js";
-import { createCardRecord } from "@/modules/card-module-setup/services/cardModuleSetup.service.js";
+import { getSupabase } from "@/modules/admin/card-module-setup/utils/supabase.js";
+import { createCardRecord } from "@/modules/admin/card-module-setup/services/cardModuleSetup.service.js";
 
 export async function POST(request) {
   const body = await request.json().catch(() => ({}));
@@ -180,15 +180,15 @@ export async function POST(request) {
   return NextResponse.json({ ok: true, card });
 }
 
-// ── 6. CLIENT PAGE ── src/app/card-module-setup/page.js (server component)
-import { loadCardModuleSetupData } from "@/modules/card-module-setup/hooks/cardModuleSetupData.js";
+// -- 6. CLIENT PAGE -- src/app/card-module-setup/page.js (server component)
+import { loadCardModuleSetupData } from "@/modules/admin/card-module-setup/hooks/cardModuleSetupData.js";
 
 export default async function CardModuleSetupPage() {
   const { cardGroups, cards } = await loadCardModuleSetupData();
   return <CardModuleSetupClient seedCardGroups={cardGroups} seedCards={cards} />;
 }
 
-// ── 7. CLIENT COMPONENT ── binds data to TableZ
+// -- 7. CLIENT COMPONENT -- binds data to TableZ
 const selectedGroupCards = useMemo(() =>
   allCards
     .filter((card) => card.group_id === selectedGroup?.group_id)
@@ -238,13 +238,13 @@ const filterConfig = createFilterConfig([
 const SNIPPET_TABLE_FILTERS_DATABIND = `// Databind filter items from API (use when options come from the database)
 //
 // Real example: User Master Setup — role filter loaded from psb_s_app_roles
-// API endpoint: GET /api/user-master-setup/lookups
+// API endpoint: GET /api/admin/user-master-setup/lookups
 //
 // Backend returns: { roles: [{ role_id: 1, role_name: "Admin" }, ...] }
 const [roleOptions, setRoleOptions] = useState([]);
 
 useEffect(() => {
-  fetch("/api/user-master-setup/lookups")
+  fetch("/api/admin/user-master-setup/lookups")
     .then((r) => r.json())
     .then((data) => {
       // Map API response to the { label, value } shape the filter expects
@@ -261,7 +261,7 @@ const filterConfig = createFilterConfig([
     key: "role_id",
     label: "Role",
     type: TABLE_FILTER_TYPES.SELECT,
-    options: roleOptions,   // ← populated from the API response
+    options: roleOptions,   // ? populated from the API response
   },
   {
     key: "created_at",
@@ -347,9 +347,9 @@ const groupActions = useMemo(() => [
 ], []);
 
 // Action type determines button color:
-//   "primary"   → blue
-//   "secondary" → gray
-//   "danger"    → red`;
+//   "primary"   ? blue
+//   "secondary" ? gray
+//   "danger"    ? red`;
 
 const SNIPPET_TABLE_ONCHANGE = `// onChange receives ALL table events through a single channel.
 // event.type tells you what happened. Switch on it.
@@ -357,14 +357,14 @@ const SNIPPET_TABLE_ONCHANGE = `// onChange receives ALL table events through a 
 // Real example from: useDataTableModuleController.js (Data Table Example)
 //
 // Event types emitted by <TableZ />:
-//   "search"           → user typed in the search bar
-//   "filters"          → user changed a filter dropdown / date range
-//   "sorting"          → user clicked a sortable column header
-//   "pagination"       → user changed page or page size
-//   "action"           → user clicked a row action button
-//   "export"           → user clicked CSV/Excel export
-//   "columnVisibility" → user toggled a column in Customize panel
-//   "columnResize"     → user resized a column by dragging
+//   "search"           ? user typed in the search bar
+//   "filters"          ? user changed a filter dropdown / date range
+//   "sorting"          ? user clicked a sortable column header
+//   "pagination"       ? user changed page or page size
+//   "action"           ? user clicked a row action button
+//   "export"           ? user clicked CSV/Excel export
+//   "columnVisibility" ? user toggled a column in Customize panel
+//   "columnResize"     ? user resized a column by dragging
 
 function handleTableChange(event) {
   switch (event.type) {
@@ -427,10 +427,10 @@ function handleTableChange(event) {
 const SNIPPET_BUTTON = `import { Button } from "@/shared/components/ui";
 
 // Variants determine the visual style and semantic meaning:
-//   "primary"   → main action (Save, Submit, Approve)
-//   "secondary" → secondary action (Cancel, Back, Reset)
-//   "danger"    → destructive action (Delete, Deactivate, Reject)
-//   "ghost"     → subtle/text-only action (Help, View Details)
+//   "primary"   ? main action (Save, Submit, Approve)
+//   "secondary" ? secondary action (Cancel, Back, Reset)
+//   "danger"    ? destructive action (Delete, Deactivate, Reject)
+//   "ghost"     ? subtle/text-only action (Help, View Details)
 
 // Real example: Card Module Setup batch save toolbar
 <Button variant="primary" loading={isSaving} onClick={handleSaveBatch}>
@@ -486,7 +486,7 @@ const SNIPPET_SEARCHBAR = `import { SearchBar } from "@/shared/components/ui";
   debounceMs={350}
   placeholder="Search code, name, team, role, status"
   onDebouncedChange={(nextValue) => {
-    // Update table state → triggers data re-fetch
+    // Update table state ? triggers data re-fetch
     setTableState((prev) => ({
       ...prev,
       filters: { ...prev.filters, search: nextValue },
@@ -687,7 +687,7 @@ const loadData = useCallback(async () => {
 const SNIPPET_MODAL_SAVE_FLOW = `// Modal with full save-to-API flow
 //
 // Real example: Card Module Setup — Add Card Group with API call
-// API: POST /api/card-module-setup/card-groups
+// API: POST /api/admin/card-module-setup/card-groups
 // Request body: { app_id, group_name, group_desc, icon }
 //
 const [dialog, setDialog] = useState({ kind: null });
@@ -703,7 +703,7 @@ const handleConfirmAddGroup = async () => {
 
   setIsMutatingAction(true);
   try {
-    const response = await fetch("/api/card-module-setup/card-groups", {
+    const response = await fetch("/api/admin/card-module-setup/card-groups", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -932,7 +932,7 @@ export function mapAppRole(row) {
 
 const SNIPPET_REPO_SUPABASE = `// utils/supabase.js
 //
-// ⚠️ Every module MUST use this helper instead of calling getSupabase() directly.
+// ?? Every module MUST use this helper instead of calling getSupabase() directly.
 // Modules are loaded at runtime via a dynamic filesystem loader.
 // The core Supabase singleton may not be initialized yet at that point.
 //
@@ -958,7 +958,7 @@ export async function getSupabase() {
 }
 
 // repo/appRole.repo.js
-// ✅ Repo receives supabase as a parameter — it never imports it directly.
+// ? Repo receives supabase as a parameter — it never imports it directly.
 import { mapAppRole } from "../model/appRole.model";
 
 export const appRoleRepo = {
@@ -1620,12 +1620,12 @@ const MODULE_CREATION_STEPS = [
                   </p>
                   <p>This is now:</p>
                   <ul style={{ marginTop: "0.5rem", paddingLeft: "1.5rem" }}>
-                    <li>✅ Real DB (your table)</li>
-                    <li>✅ Real CRUD</li>
-                    <li>✅ Clean separation</li>
-                    <li>✅ No overengineering</li>
-                    <li>✅ No DTO/interface bloat</li>
-                    <li>✅ Still scalable</li>
+                    <li>? Real DB (your table)</li>
+                    <li>? Real CRUD</li>
+                    <li>? Clean separation</li>
+                    <li>? No overengineering</li>
+                    <li>? No DTO/interface bloat</li>
+                    <li>? Still scalable</li>
                   </ul>
                 </div>
               )
@@ -1640,7 +1640,7 @@ const MODULE_CREATION_STEPS = [
                   </p>
                   <p>This line:</p>
                   <pre style={{ margin: "0.5rem 0", padding: "0.5rem", backgroundColor: "#fff", borderRadius: "4px", overflow: "auto" }}>return data.map(mapRole);</pre>
-                  <p style={{ marginTop: "0.5rem" }}>⚠️ That&apos;s your entire protection layer</p>
+                  <p style={{ marginTop: "0.5rem" }}>?? That&apos;s your entire protection layer</p>
                   <p>Remove that — your system degrades fast.</p>
                 </div>
               )
@@ -2701,12 +2701,12 @@ function ReferenceTab() {
           </div>
 
           <hr style={{ margin: "2rem 0", borderColor: "#ddd" }} />
-          <p className={styles.ruleHeading}>How to Databind Table (End-to-End: Database → API → Frontend)</p>
+          <p className={styles.ruleHeading}>How to Databind Table (End-to-End: Database ? API ? Frontend)</p>
           <p className={styles.stepNote}>
             This is the <strong>complete flow</strong> for binding a Supabase database table to the shared Table component.
             Real example from: Card Module Setup (table: <code>psb_s_appcard</code>).
           </p>
-          <Snippet title="Full Data Binding Flow (DB → API → Frontend → Table)" code={SNIPPET_TABLE_DATABIND} />
+          <Snippet title="Full Data Binding Flow (DB ? API ? Frontend ? Table)" code={SNIPPET_TABLE_DATABIND} />
 
           <hr style={{ margin: "2rem 0", borderColor: "#ddd" }} />
           <p className={styles.ruleHeading}>Column Configuration</p>
@@ -3051,9 +3051,9 @@ const userActions = [
 />
 
 // Action types:
-//   "primary"   → blue button  (for: Edit, View, Preview)
-//   "secondary" → gray button  (for: Duplicate, Export)
-//   "danger"    → red button   (for: Delete, Deactivate)`;
+//   "primary"   ? blue button  (for: Edit, View, Preview)
+//   "secondary" ? gray button  (for: Duplicate, Export)
+//   "danger"    ? red button   (for: Delete, Deactivate)`;
 
 const TABLEX_SNIPPET_FEATURES = `// Features let you turn table powers on or off.
 // By default, everything is ON except drag and batch.
@@ -3559,7 +3559,7 @@ function TableZTab() {
         },
         {
           key: "table-masterdetail",
-          title: "3. Master-Detail (click row → show related data)",
+          title: "3. Master-Detail (click row ? show related data)",
           content: (
             <div className={styles.refBody}>
               <p className={styles.stepNote}>
@@ -3683,7 +3683,7 @@ function TableZTab() {
                     <li>You need full control over state and data fetching</li>
                     <li>You need drag-and-drop reordering</li>
                     <li>You need batch editing (create/update/delete)</li>
-                    <li>You need master-detail (click row → show related)</li>
+                    <li>You need master-detail (click row ? show related)</li>
                     <li>You need custom server-side logic</li>
                   </ul>
                 </div>

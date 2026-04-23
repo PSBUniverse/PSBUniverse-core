@@ -3,11 +3,11 @@ import { loadModules } from "@/modules/loadModules";
 import ModuleAccessGate from "@/core/auth/ModuleAccessGate";
 
 const pageImporters = {
-  "application-setup": (page) => import(`@/modules/application-setup/pages/${page}`),
-  "card-module-setup": (page) => import(`@/modules/card-module-setup/pages/${page}`),
-  "company-department-setup": (page) => import(`@/modules/company-department-setup/pages/${page}`),
-  "status-setup": (page) => import(`@/modules/status-setup/pages/${page}`),
-  "user-master-setup": (page) => import(`@/modules/user-master-setup/pages/${page}`),
+  "application-setup": (page) => import(`@/modules/admin/application-setup/pages/${page}`),
+  "card-module-setup": (page) => import(`@/modules/admin/card-module-setup/pages/${page}`),
+  "company-department-setup": (page) => import(`@/modules/admin/company-department-setup/pages/${page}`),
+  "status-setup": (page) => import(`@/modules/admin/status-setup/pages/${page}`),
+  "user-master-setup": (page) => import(`@/modules/admin/user-master-setup/pages/${page}`),
 };
 
 function buildPath(segments) {
