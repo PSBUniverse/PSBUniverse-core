@@ -200,6 +200,7 @@ export default function TableZ({
   actions = [],
   showActionColumn = true,
   batchMode = false,
+  batchFields = [],
   onBatchChange,
   onBatchSave,
   draggable = false,
@@ -244,6 +245,7 @@ export default function TableZ({
     data: dataset,
     rowIdKey,
     batchMode,
+    batchFields,
     onBatchChange,
     onBatchSave,
   });
@@ -502,6 +504,8 @@ export default function TableZ({
   );
 
   const batchControlsVisible = batchMode === true;
+  const batchDiff = batch.diff;
+  const batchDiffById = batchDiff?.byId;
 
   const handleSaveBatch = useCallback(async () => {
     if (!batchControlsVisible || !batch.hasPendingChanges || isBatchSubmitting) {
@@ -528,7 +532,9 @@ export default function TableZ({
   const batchControls = batchControlsVisible ? (
     <div className="psb-ui-table-batch-controls">
       <span className={`small ${batch.hasPendingChanges ? "text-warning-emphasis fw-semibold" : "text-muted"}`}>
-        {batch.hasPendingChanges ? "Unsaved changes" : "No changes"}
+        {batch.hasPendingChanges
+          ? `Unsaved: ${batchDiff.newRows} new, ${batchDiff.modifiedRows} modified, ${batchDiff.removedRows} removed`
+          : "No changes"}
       </span>
       <div className="psb-ui-table-batch-controls-actions">
         <button
@@ -568,6 +574,7 @@ export default function TableZ({
     onBatchChange,
     batchApi: batch,
     onRowAction: controlledMode ? handleRowAction : undefined,
+    rowIdKey,
   });
 
   const drag = useTableDragNDrop({
@@ -849,6 +856,7 @@ export default function TableZ({
       renderCellContext,
       emptyValue: controlledMode ? "-" : "--",
       striped: !controlledMode,
+      batchDiff: batchDiffById,
     });
 
   const tableMarkup = (

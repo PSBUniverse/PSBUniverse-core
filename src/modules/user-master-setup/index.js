@@ -1,5 +1,3 @@
-import DashboardPage from "./pages/DashboardPage.js";
-
 const appIdFromEnv = Number(process.env.USER_MASTER_SETUP_APP_ID);
 const appId = Number.isFinite(appIdFromEnv) ? appIdFromEnv : 2;
 
@@ -13,7 +11,7 @@ const userMasterSetupModule = {
   group_desc: "Internal setup tools for user administration.",
   order: 110,
   routes: [
-    { path: "/user-master-setup", component: DashboardPage },
+    { path: "/user-master-setup", page: "DashboardPage" },
   ],
 };
 

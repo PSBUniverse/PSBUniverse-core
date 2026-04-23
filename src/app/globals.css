@@ -510,6 +510,46 @@
   text-decoration: none;
 }
 
+/* Diff-based batch row classes */
+.psb-row-new td {
+  background: #eefaf4 !important;
+}
+
+.psb-row-new:hover td {
+  background: #e2f4ea !important;
+}
+
+.psb-row-modified td {
+  background: #fff8e6 !important;
+}
+
+.psb-row-modified:hover td {
+  background: #fff3cf !important;
+}
+
+.psb-row-pending-remove td {
+  background: #fff1f1 !important;
+  color: #8f2323 !important;
+  text-decoration: line-through;
+  text-decoration-thickness: 1px;
+}
+
+.psb-row-pending-remove:hover td {
+  background: #ffe6e6 !important;
+}
+
+.psb-row-pending-remove td .btn,
+.psb-row-pending-remove td .badge,
+.psb-row-pending-remove td i {
+  text-decoration: none;
+}
+
+/* Cell-level change highlight */
+.psb-cell-changed {
+  background: #fff0c8 !important;
+  box-shadow: inset 0 0 0 1px #e6c960;
+}
+
 .psb-ui-card {
   border: 1px solid #d3e0ea;
   box-shadow: 0 8px 22px rgba(18, 53, 81, 0.08);

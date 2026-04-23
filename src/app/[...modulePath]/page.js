@@ -2,6 +2,14 @@ import { notFound } from "next/navigation";
 import { loadModules } from "@/modules/loadModules";
 import ModuleAccessGate from "@/core/auth/ModuleAccessGate";
 
+const pageImporters = {
+  "application-setup": (page) => import(`@/modules/application-setup/pages/${page}`),
+  "card-module-setup": (page) => import(`@/modules/card-module-setup/pages/${page}`),
+  "company-department-setup": (page) => import(`@/modules/company-department-setup/pages/${page}`),
+  "status-setup": (page) => import(`@/modules/status-setup/pages/${page}`),
+  "user-master-setup": (page) => import(`@/modules/user-master-setup/pages/${page}`),
+};
+
 function buildPath(segments) {
   return `/${segments.join("/")}`;
 }
@@ -34,7 +42,14 @@ export default async function ModuleRoutePage({ params, searchParams }) {
         continue;
       }
 
-      const Component = route.component;
+      const importer = pageImporters[moduleDefinition.key];
+
+      if (!importer || !route.page) {
+        continue;
+      }
+
+      const pageModule = await importer(route.page);
+      const Component = pageModule.default;
 
       return (
         <ModuleAccessGate appId={moduleDefinition.app_id}>

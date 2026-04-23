@@ -1,25 +1,5 @@
-"use client";
+import DataTablePage from "@/modules/examples/pages/data-table/DataTablePage";
 
-import { useAuth } from "@/core/auth/useAuth";
-import DataTableExampleModule from "@/app/examples/data-table/DataTableExampleModule";
-
-function resolveUserScope(authUser, dbUser) {
-  const userId = String(dbUser?.user_id || authUser?.id || "").trim();
-  if (userId) {
-    return userId;
-  }
-
-  const email = String(dbUser?.email || authUser?.email || "").trim().toLowerCase();
-  if (email) {
-    return email;
-  }
-
-  return "anonymous";
-}
-
-export default function DataTableCompanionExamplePage() {
-  const { authUser, dbUser } = useAuth();
-  const userScope = resolveUserScope(authUser, dbUser);
-
-  return <DataTableExampleModule key={userScope} userScope={userScope} />;
+export default function Page() {
+  return <DataTablePage />;
 }

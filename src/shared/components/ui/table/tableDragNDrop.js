@@ -25,6 +25,7 @@ function applyReorderState(rows) {
       ...(row || {}),
       order: nextOrder,
       __batchState: nextBatchState,
+      __pendingRemove: Boolean(row?.__pendingRemove),
     };
   });
 }

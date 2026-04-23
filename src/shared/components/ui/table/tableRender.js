@@ -2,7 +2,7 @@ import { SortableContext, useSortable, verticalListSortingStrategy } from "@dnd-
 import { CSS } from "@dnd-kit/utilities";
 import Button from "@/shared/components/ui/controls/Button";
 import ActionColumn from "@/shared/components/ui/table/ActionColumn";
-import { getNestedValue, resolveBatchClassName, toRowId } from "@/shared/components/ui/table/tableUtils";
+import { getNestedValue, resolveBatchClassName, resolveBatchDiffClassName, resolveCellDiffClassName, toRowId } from "@/shared/components/ui/table/tableUtils";
 
 function resolveCellStyle(column) {
   return {
@@ -85,6 +85,7 @@ function DataRowCells({
   columns,
   renderCellContext,
   emptyValue,
+  diffEntry,
 }) {
   return columns.map((column) => {
     const rawValue = getNestedValue(row, column.key);
@@ -93,8 +94,11 @@ function DataRowCells({
         ? column.render(row, rawValue, renderCellContext({ row, rowIndex, column }))
         : renderFallbackValue(rawValue, emptyValue);
 
+    const cellDiffClass = resolveCellDiffClassName(diffEntry, column.key);
+    const cellStyle = resolveCellStyle(column);
+
     return (
-      <td key={`${rowId}-${column.key}`} style={resolveCellStyle(column)}>
+      <td key={`${rowId}-${column.key}`} style={cellStyle} className={cellDiffClass || undefined}>
         {rendered}
       </td>
     );
@@ -116,9 +120,11 @@ function SortableBodyRow({
   renderCellContext,
   emptyValue,
   striped,
+  batchDiff,
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: rowId });
   const isSelected = String(selectedRowId ?? "") === String(row?.[rowIdKey] ?? "");
+  const diffEntry = batchDiff?.get(rowId);
 
   const style = {
     transform: CSS.Transform.toString(transform),
@@ -128,10 +134,14 @@ function SortableBodyRow({
     cursor: rowClickable ? "pointer" : "default",
   };
 
+  const batchRowClass = diffEntry
+    ? resolveBatchDiffClassName(diffEntry)
+    : resolveBatchClassName(row?.__batchState);
+
   const rowClassName = [
     "psb-setup-row",
     striped && rowIndex % 2 === 1 ? "table-light" : "",
-    resolveBatchClassName(row?.__batchState),
+    batchRowClass,
     isSelected ? "psb-setup-row-selected" : "",
   ].filter(Boolean).join(" ");
 
@@ -159,6 +169,7 @@ function SortableBodyRow({
         columns={columns}
         renderCellContext={renderCellContext}
         emptyValue={emptyValue}
+        diffEntry={diffEntry}
       />
     </tr>
   );
@@ -179,13 +190,19 @@ function StaticBodyRow({
   renderCellContext,
   emptyValue,
   striped,
+  batchDiff,
 }) {
   const isSelected = String(selectedRowId ?? "") === String(row?.[rowIdKey] ?? "");
+  const diffEntry = batchDiff?.get(rowId);
+
+  const batchRowClass = diffEntry
+    ? resolveBatchDiffClassName(diffEntry)
+    : resolveBatchClassName(row?.__batchState);
 
   const rowClassName = [
     "psb-setup-row",
     striped && rowIndex % 2 === 1 ? "table-light" : "",
-    resolveBatchClassName(row?.__batchState),
+    batchRowClass,
     isSelected ? "psb-setup-row-selected" : "",
   ].filter(Boolean).join(" ");
 
@@ -214,6 +231,7 @@ function StaticBodyRow({
         columns={columns}
         renderCellContext={renderCellContext}
         emptyValue={emptyValue}
+        diffEntry={diffEntry}
       />
     </tr>
   );
@@ -235,6 +253,7 @@ export function renderTableBody({
   renderCellContext,
   emptyValue,
   striped = false,
+  batchDiff,
 }) {
   const normalizedRows = Array.isArray(rows) ? rows : [];
   const hasRows = normalizedRows.length > 0;
@@ -276,6 +295,7 @@ export function renderTableBody({
                 renderCellContext={renderCellContext}
                 emptyValue={emptyValue}
                 striped={striped}
+                batchDiff={batchDiff}
               />
             );
           })}
@@ -306,6 +326,7 @@ export function renderTableBody({
             renderCellContext={renderCellContext}
             emptyValue={emptyValue}
             striped={striped}
+            batchDiff={batchDiff}
           />
         );
       })}

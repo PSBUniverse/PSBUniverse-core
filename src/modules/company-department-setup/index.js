@@ -1,5 +1,3 @@
-import DashboardPage from "./pages/DashboardPage.js";
-
 const appIdFromEnv = Number(process.env.COMPANY_DEPARTMENT_SETUP_APP_ID);
 const appId = Number.isFinite(appIdFromEnv) ? appIdFromEnv : 1;
 
@@ -13,7 +11,7 @@ const companyDepartmentSetupModule = {
   group_desc: "Tools for organization setup and management.",
   order: 120,
   routes: [
-    { path: "/company-department-setup", component: DashboardPage },
+    { path: "/company-department-setup", page: "DashboardPage" },
   ],
 };
 

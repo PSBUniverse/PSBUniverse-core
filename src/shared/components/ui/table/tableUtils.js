@@ -163,6 +163,21 @@ export function resolveBatchClassName(batchState) {
   return "";
 }
 
+export function resolveBatchDiffClassName(diffEntry) {
+  if (!diffEntry) return "";
+  if (diffEntry.isPendingRemove) return "psb-row-pending-remove";
+  if (diffEntry.isNew) return "psb-row-new";
+  if (diffEntry.isChanged) return "psb-row-modified";
+  return "";
+}
+
+export function resolveCellDiffClassName(diffEntry, columnKey) {
+  if (!diffEntry || !columnKey) return "";
+  if (diffEntry.isPendingRemove) return "";
+  if (diffEntry.changedColumns && diffEntry.changedColumns.has(columnKey)) return "psb-cell-changed";
+  return "";
+}
+
 export function toRowId(row, rowIdKey, index) {
   const value = row?.[rowIdKey];
   return value === undefined || value === null || value === "" ? `row-${index}` : String(value);

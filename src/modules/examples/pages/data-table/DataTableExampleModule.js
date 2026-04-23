@@ -1,7 +1,7 @@
 "use client";
 
 import { Card, TableZ } from "@/shared/components/ui";
-import { useDataTableModuleController } from "@/app/examples/data-table/useDataTableModuleController";
+import { useDataTableModuleController } from "./useDataTableModuleController";
 
 export default function DataTableExampleModule({ userScope }) {
   const {

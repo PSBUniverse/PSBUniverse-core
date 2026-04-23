@@ -1,7 +1,9 @@
 import { useCallback } from "react";
 import {
+  BATCH_TYPE_DELETED,
   resolveBatchTypeFromAction,
   resolveNextBatchState,
+  toRowId,
 } from "@/shared/components/ui/table/tableUtils";
 
 export function useTableActions({
@@ -9,6 +11,7 @@ export function useTableActions({
   onBatchChange,
   onRowAction,
   batchApi,
+  rowIdKey = "id",
 }) {
   const handleAction = useCallback(
     ({ action, row, rowIndex }) => {
@@ -18,6 +21,14 @@ export function useTableActions({
 
       if (batchMode) {
         const batchType = resolveBatchTypeFromAction(action);
+
+        // New diff-based path: delete actions toggle __pendingRemove
+        if (batchType === BATCH_TYPE_DELETED && batchApi && typeof batchApi.removeRow === "function") {
+          const rowId = toRowId(row, rowIdKey, rowIndex);
+          batchApi.removeRow(rowId);
+          return;
+        }
+
         const nextBatchState = resolveNextBatchState(row?.__batchState, batchType);
         const nextRow = {
           ...(row || {}),
@@ -61,7 +72,7 @@ export function useTableActions({
         action.onClick(row, rowIndex);
       }
     },
-    [batchApi, batchMode, onBatchChange, onRowAction],
+    [batchApi, batchMode, onBatchChange, onRowAction, rowIdKey],
   );
 
   return {

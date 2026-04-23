@@ -1,5 +1,3 @@
-import DashboardPage from "./pages/DashboardPage.js";
-
 const appIdFromEnv = Number(process.env.CARD_MODULE_SETUP_APP_ID);
 const appId = Number.isFinite(appIdFromEnv) ? appIdFromEnv : 1;
 
@@ -13,7 +11,7 @@ const cardModuleSetupModule = {
   group_desc: "Tools for system configuration and management.",
   order: 130,
   routes: [
-    { path: "/card-module-setup", component: DashboardPage },
+    { path: "/card-module-setup", page: "DashboardPage" },
   ],
 };
 

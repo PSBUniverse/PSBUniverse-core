@@ -1,5 +1,3 @@
-import DashboardPage from "./pages/DashboardPage.js";
-
 const appId = 1;
 
 const applicationSetupModule = {
@@ -12,7 +10,7 @@ const applicationSetupModule = {
   group_desc: "Tools for system configuration and management.",
   order: 100,
   routes: [
-    { path: "/application-setup", component: DashboardPage },
+    { path: "/application-setup", page: "DashboardPage" },
   ],
 };
 
