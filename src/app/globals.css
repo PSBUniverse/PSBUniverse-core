@@ -456,6 +456,18 @@
   border: 1px solid #eed99b;
 }
 
+.psb-batch-marker-activated {
+  color: #0d6832;
+  background: #d1f5e0;
+  border: 1px solid #a3e4bf;
+}
+
+.psb-batch-marker-deactivated {
+  color: #8f2323;
+  background: #ffe9e9;
+  border: 1px solid #f5c6c6;
+}
+
 .psb-row-created td,
 .psb-batch-row-new td {
   background: #eefaf4 !important;
