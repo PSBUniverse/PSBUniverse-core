@@ -83,22 +83,26 @@ const SNIPPET_TABLE_STATE = `const [tableState, setTableState] = useState({
   columnSizing: {},
 });`;
 
-const SNIPPET_TABLE_DATABIND = `// --- FULL END-TO-END: Database ? API ? Frontend ? Table ---
+const SNIPPET_TABLE_DATABIND = `// --- FULL END-TO-END: How data flows from Database to your Table ---
+//
+// This shows the COMPLETE journey of data in a real module.
+// Read each layer top to bottom — this is the exact pattern every module follows.
 //
 // DATA SOURCE
 //   Table: psb_s_appcard (Supabase)
 //   Columns: card_id (PK), group_id (FK), card_name, card_desc,
 //            route_path, icon, display_order, is_active
 //
-// LAYER STACK
-//   1. Model   – maps raw DB row ? UI-friendly shape
+// LAYER STACK (each layer has ONE job)
+//   1. Model   – maps raw DB row → UI-friendly shape (so UI never sees raw columns)
 //   2. Repo    – Supabase queries (ONLY layer that calls .from())
 //   3. Service – business logic, validation, orchestration
-//   4. Hook    – calls service, returns data for the page
+//   4. Hook    – calls service, returns data for the page (runs on server)
 //   5. API     – Next.js route handler (POST /api/admin/card-module-setup/cards)
-//   6. Client  – fetches API, binds data to <TableZ />
+//   6. Page    – server component that loads data and passes to View
+//   7. View    – client component that wires hook → components → <TableZ />
 
-// -- 1. MODEL -- src/modules/card-module-setup/model/card.model.js
+// -- 1. MODEL -- src/modules/admin/card-module-setup/model/card.model.js
 export function isCardActive(card) {
   if (card?.is_active === false || card?.is_active === 0) return false;
   const text = String(card?.is_active ?? "").trim().toLowerCase();
@@ -109,7 +113,7 @@ export function getCardDisplayName(card) {
   return card?.card_name || card?.name || "Unknown";
 }
 
-// -- 2. REPO -- src/modules/card-module-setup/repo/cards.repo.js
+// -- 2. REPO -- src/modules/admin/card-module-setup/repo/cards.repo.js
 const TABLE = "psb_s_appcard";
 
 export async function fetchCardsByGroupId(supabase, groupId) {
@@ -134,7 +138,7 @@ export async function createCard(supabase, payload) {
   return data;
 }
 
-// -- 3. SERVICE -- src/modules/card-module-setup/services/cardModuleSetup.service.js
+// -- 3. SERVICE -- src/modules/admin/card-module-setup/services/cardModuleSetup.service.js
 import { fetchCardsByGroupId, createCard } from "../repo/cards.repo.js";
 
 export async function getCardList(supabase) {
@@ -159,7 +163,7 @@ export async function createCardRecord(supabase, payload) {
   });
 }
 
-// -- 4. HOOK -- src/modules/card-module-setup/hooks/cardModuleSetupData.js
+// -- 4. HOOK -- src/modules/admin/card-module-setup/hooks/cardModuleSetupData.js
 import { getSupabase } from "../utils/supabase.js";
 import { getCardModuleSetupViewModel } from "../services/cardModuleSetup.service.js";
 
@@ -180,7 +184,8 @@ export async function POST(request) {
   return NextResponse.json({ ok: true, card });
 }
 
-// -- 6. CLIENT PAGE -- src/app/card-module-setup/page.js (server component)
+// -- 6. CLIENT PAGE -- src/app/admin/card-module-setup/page.js (server component)
+import CardModuleSetupPage from "@/modules/admin/card-module-setup/pages/CardModuleSetupPage";
 import { loadCardModuleSetupData } from "@/modules/admin/card-module-setup/hooks/cardModuleSetupData.js";
 
 export default async function CardModuleSetupPage() {
@@ -852,38 +857,49 @@ const SNIPPET_TOKENS = `/* Design tokens \u2014 from src/styles/variables.css */
 /* Transitions */
 --psb-transition-150  --psb-transition-200`;
 
-const SNIPPET_MODULE_STRUCTURE = `src/modules/<module-name>/
-  index.js
-  pages/
-  components/
-  hooks/
-  services/
+const SNIPPET_MODULE_STRUCTURE = `src/modules/admin/<module-name>/
+  index.js              ← module entry point (routes, metadata)
+  pages/                ← server components (data loading, access gate)
+  view/                 ← client components ("use client" layout layer)
+  components/           ← pure UI (props only, no logic)
+  hooks/                ← state management + side effects
+  services/             ← business logic + validation
   repo/
-    <module>.repo.js
+    <module>.repo.js    ← Supabase queries (ONLY place that calls .from())
   model/
-    <module>.model.js
-  utils/`;
+    <module>.model.js   ← maps DB rows → UI-friendly objects
+  utils/                ← helpers, constants, formatters`;
 
-const SNIPPET_MODULE_MANIFEST = `import DashboardPage from "./pages/DashboardPage";
+const SNIPPET_MODULE_MANIFEST = `// index.js — this is your module's registration file.
+// The module loader reads this to know your module exists.
+//
+// key      → unique slug (used in URLs and the dynamic router)
+// app_id   → must match the row in psb_s_application table
+// routes   → page: string name that maps to a file in pages/
 
 export default {
   key: "gutter",
   app_id: 1001,
   name: "Gutter",
+  description: "Gutter ordering and configuration.",
+  icon: "bi-bucket",
   routes: [
-    { path: "/gutter", component: DashboardPage },
-    { path: "/gutter/settings", component: DashboardPage },
+    { path: "/admin/gutter", page: "DashboardPage" },
   ],
 };`;
 
-const SNIPPET_MODULE_BUILD_SEQUENCE = `1. Create folder: src/modules/<module-name>/
-2. Register app in psb_s_application
-3. Create groups in psb_m_appcardgroup
-4. Create cards in psb_s_appcard
-5. Assign role access in psb_m_appcardroleaccess
-6. Build UI with shared components
-7. Apply card access checks
-8. Test authorized and unauthorized flows`;
+const SNIPPET_MODULE_BUILD_SEQUENCE = `1. Create folder: src/modules/admin/<module-name>/
+2. Create required subfolders: pages/, view/, components/, hooks/, services/, repo/, model/, utils/
+3. Register app in psb_s_application table
+4. Create groups in psb_m_appcardgroup
+5. Create cards in psb_s_appcard
+6. Assign role access in psb_m_appcardroleaccess
+7. Create index.js with module manifest (key, app_id, routes)
+8. Create page route: src/app/admin/<module-name>/page.js
+9. Build UI using shared components (TableZ, Card, Modal, etc.)
+10. Apply card access checks via ModuleAccessGate
+11. Test authorized and unauthorized flows
+12. Run npm run build — must pass clean`;
 
 const SNIPPET_CRUD_REPOSITORY_PATTERN = `// hooks/useUsersData.js
 import { usersService } from "../services/users.service";
@@ -937,7 +953,7 @@ const SNIPPET_REPO_SUPABASE = `// utils/supabase.js
 // The core Supabase singleton may not be initialized yet at that point.
 //
 export async function getSupabase() {
-  const mod = await import("../../../../src/core/supabase/client.js");
+  const mod = await import("../../../../core/supabase/client.js");
 
   try {
     // Case 1: core already initialized the singleton
@@ -952,7 +968,7 @@ export async function getSupabase() {
     }
 
     // Case 3: server-side — fall back to admin client
-    const { getSupabaseAdmin } = await import("../../../../src/core/supabase/admin.js");
+    const { getSupabaseAdmin } = await import("../../../../core/supabase/admin.js");
     return getSupabaseAdmin();
   }
 }
@@ -983,22 +999,25 @@ export const appRoleService = {
   },
 };`;
 
-const SNIPPET_ROLES_STRUCTURE = `modules/roles/
-  src/
-    index.js
-    pages/
-      RolesPage.jsx
-    components/
-      RolesTable.jsx
-    hooks/
-      useRolesTable.js
-    services/
-      roles.service.js
-    repo/
-      roles.repo.js
-    model/
-      roles.model.js
-    utils/`;
+const SNIPPET_ROLES_STRUCTURE = `src/modules/admin/roles/
+  index.js
+  pages/
+    RolesPage.jsx         ← server component (loads data, wraps in access gate)
+    DashboardPage.js      ← static landing page
+  view/
+    RolesView.jsx         ← "use client" layout (wires hook → components)
+  components/
+    RolesTable.jsx        ← pure UI table (receives data via props)
+  hooks/
+    useRolesTable.js      ← manages state, calls service
+  services/
+    roles.service.js      ← business logic + validation
+  repo/
+    roles.repo.js         ← Supabase CRUD queries
+  model/
+    roles.model.js        ← maps DB rows → clean objects
+  utils/
+    supabase.js           ← module-local Supabase client helper`;
 
 const SNIPPET_ROLES_MODEL = `// model/roles.model.js
 
@@ -1165,38 +1184,63 @@ export default function RolesTable({ data, onDelete }) {
   );
 }`;
 
-const SNIPPET_ROLES_PAGE = `// pages/RolesPage.jsx
+const SNIPPET_ROLES_PAGE = `// pages/RolesPage.jsx — SERVER COMPONENT (no "use client")
+// This runs on the server. It loads data and passes it to the View.
 
-import RolesTable from "../components/RolesTable";
-import { useRolesTable } from "../hooks/useRolesTable";
+import ModuleAccessGate from "@/core/auth/ModuleAccessGate";
+import RolesView from "../view/RolesView";
 import { rolesService } from "../services/roles.service";
 
-export default function RolesPage() {
-  const { data, reload } = useRolesTable();
+const APP_ID = 1001; // must match psb_s_application row
 
-  async function handleDelete(id) {
-    await rolesService.deleteRole(id);
-    reload();
-  }
+export default async function RolesPage() {
+  const data = await rolesService.getRoles();
 
   return (
-    <div>
-      <h1>Roles</h1>
-      <RolesTable data={data} onDelete={handleDelete} />
-    </div>
+    <ModuleAccessGate appId={APP_ID}>
+      <RolesView roles={data} />
+    </ModuleAccessGate>
   );
 }`;
 
-const SNIPPET_ROLES_INDEX = `// index.js
+const SNIPPET_ROLES_VIEW = `// view/RolesView.jsx — CLIENT COMPONENT ("use client")
+// This is the glue between the hook and the UI components.
+// It calls the hook and spreads its return values to components.
 
-import RolesPage from "./pages/RolesPage";
+"use client";
+
+import { useRolesTable } from "../hooks/useRolesTable";
+import RolesTable from "../components/RolesTable";
+import { Card } from "@/shared/components/ui";
+import { rolesService } from "../services/roles.service";
+
+export default function RolesView({ roles }) {
+  // The hook manages ALL state and returns everything the UI needs
+  const { data, reload } = useRolesTable({ roles });
+
+  return (
+    <main className="container py-4">
+      <Card title="Roles">
+        <RolesTable data={data} onDelete={async (id) => {
+          await rolesService.deleteRole(id);
+          reload();
+        }} />
+      </Card>
+    </main>
+  );
+}`;
+
+const SNIPPET_ROLES_INDEX = `// index.js — module manifest
+// The module loader scans for this file to register your module.
 
 export default {
   key: "roles",
   app_id: 1001,
   name: "Roles",
+  description: "Manage user roles and permissions.",
+  icon: "bi-shield-lock",
   routes: [
-    { path: "/roles", component: RolesPage },
+    { path: "/admin/roles", page: "DashboardPage" },
   ],
 };`;
 
@@ -1384,6 +1428,84 @@ function PatternToggle({ modes, active, onChange }) {
 
 const MODULE_CREATION_STEPS = [
   {
+    key: "step-0",
+    title: "Step 0: Project Architecture (How Everything Fits Together)",
+    content: (
+      <div className={styles.refBody}>
+        <p className={styles.stepNote}>
+          Before writing any code, understand how the project is organized. This is a <strong>Next.js App Router</strong> project
+          with <strong>Supabase</strong> as the database. Here is how the folders map to responsibilities:
+        </p>
+        <div style={{ marginTop: "1rem", padding: "1rem", backgroundColor: "#f5f5f5", borderRadius: "4px" }}>
+          <pre style={{ fontSize: "0.85rem", overflow: "auto", margin: 0 }}>{`PSBUniverse-core/
+  src/
+    app/                        ← Next.js routing (URLs)
+      admin/                    ← Admin page routes (/admin/application-setup, etc.)
+        <module>/page.js        ← Thin wrapper that imports the module's Page component
+      api/                      ← API routes (server-side endpoints)
+        admin/                  ← Admin API routes (/api/admin/application-setup/...)
+          <module>/route.js     ← Handles GET/POST/PATCH/DELETE
+        databind/               ← Generic data engine (query, options, export, schema)
+      login/                    ← Login page
+      dashboard/                ← Dashboard page
+      [...modulePath]/page.js   ← Dynamic router (catches all module routes)
+
+    modules/                    ← All business logic lives here
+      admin/                    ← Admin modules
+        application-setup/      ← Each module has the same folder structure
+        card-module-setup/
+        company-department-setup/
+        status-setup/
+        user-master-setup/
+      examples/                 ← This examples page
+      loadModules.js            ← Scans modules/ for index.js files at startup
+
+    core/                       ← Framework code (DO NOT modify)
+      auth/                     ← Login, session, RBAC, access gates
+      supabase/                 ← Database client setup (admin + browser)
+      layout/                   ← App shell (navbar, sidebar)
+
+    shared/                     ← Reusable UI components
+      components/ui/            ← TableX, TableZ, Button, Input, Modal, Badge, etc.
+      utils/                    ← toast.js, navbar-loader.js
+
+    styles/                     ← CSS variables, theme, globals`}</pre>
+        </div>
+        <div style={{ marginTop: "1.5rem" }}>
+          <p className={styles.ruleHeading}>How a Page Request Works (Simplified)</p>
+          <pre style={{ fontSize: "0.85rem", overflow: "auto", padding: "1rem", backgroundColor: "#f5f5f5", borderRadius: "4px" }}>{`User visits /admin/application-setup
+  → Next.js matches src/app/admin/application-setup/page.js
+    → page.js imports ApplicationSetupPage from src/modules/admin/application-setup/pages/
+      → ApplicationSetupPage (server) loads data via hook → service → repo → Supabase
+      → Wraps in ModuleAccessGate (checks if user has permission)
+      → Passes data to ApplicationSetupView (client "use client" component)
+        → View calls useApplicationSetup hook (manages all state)
+          → Hook returns state + handlers to components
+            → Components render using shared UI (TableZ, Card, Modal, Badge)`}</pre>
+        </div>
+        <div style={{ marginTop: "1.5rem" }}>
+          <p className={styles.ruleHeading}>Key Concepts for New Devs</p>
+          <div className={styles.ruleGrid}>
+            <div className={styles.ruleCol}>
+              <ul className={styles.ruleList}>
+                <li><strong>Modules are self-contained</strong> — each module has its own pages, hooks, services, repo, and model. No module imports from another module.</li>
+                <li><strong>Core is off-limits</strong> — never edit files in <code>src/core/</code>. It handles auth, layout, and database setup.</li>
+                <li><strong>Shared UI is your toolkit</strong> — import from <code>@/shared/components/ui</code> for all UI components. Never build your own table or modal.</li>
+              </ul>
+            </div>
+            <div className={styles.ruleCol}>
+              <ul className={styles.ruleList}>
+                <li><strong>API routes are optional</strong> — the <code>/api/databind/</code> engine handles CRUD for any table. Only create custom API routes when you need special business logic.</li>
+                <li><strong>Admin prefix</strong> — all admin modules live under <code>src/modules/admin/</code> and their routes start with <code>/admin/</code>.</li>
+                <li><strong>Server vs Client</strong> — Pages load data on the server. Views render on the client with <code>&quot;use client&quot;</code>. This separation is important for performance and security.</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </div>
+    ),
+  },
+  {
     key: "step-1",
     title: "Step 1: Core System Purpose (Foundation, Not Features)",
     content: (
@@ -1422,35 +1544,44 @@ const MODULE_CREATION_STEPS = [
             <p className={styles.ruleHeading}>Role Breakdown</p>
             <ul className={styles.ruleList}>
               <li><code>index.js</code>: Acts as the module entry point. Registers routes, exports module config, and integrates with core loader.</li>
-              <li><code>pages/</code>: Contains route-level screens. Responsible for orchestrating UI, calling hooks/services, and passing data to components.</li>
+              <li><code>pages/</code>: Server components (<code>async</code> functions). Load data from services, wrap in <code>ModuleAccessGate</code>, and pass data down to the view. No <code>&quot;use client&quot;</code> here.</li>
+              <li><code>view/</code>: Client layout components (<code>&quot;use client&quot;</code>). Wire the hook to components. This is where you call <code>useMyModuleSetup()</code> and spread its return values to child components. Think of it as the &quot;glue&quot; between the hook and the UI.</li>
               <li><code>components/</code>: Pure UI only. Receives data and handlers via props. MUST NOT contain business logic or data fetching.</li>
               <li><code>services/</code>: Contains all business logic and workflows (e.g. create, approve, reject). Acts as the only layer UI interacts with for actions. MUST NOT call Supabase directly.</li>
               <li><code>repo/&lt;module&gt;.repo.js</code>: Handles ALL Supabase/database operations. Responsible for CRUD execution. MUST NOT contain business logic. MUST transform payloads before sending to DB.</li>
               <li><code>model/&lt;module&gt;.model.js</code>: Maps database response into application-friendly structure. Acts as a lightweight data normalization layer. MUST be used on all read operations from repo.</li>
-              <li><code>hooks/</code>: Encapsulates reusable UI logic and state handling. Can call services. MUST NOT contain business logic duplication.</li>
-              <li><code>utils/</code>: Contains pure helper functions (formatters, transformers, constants). No side effects, no API calls.</li>
+              <li><code>hooks/</code>: Encapsulates reusable UI logic and state handling. Can call services. MUST NOT contain business logic duplication. The main hook is the &quot;brain&quot; of the module — it holds all state and returns everything the view needs.</li>
+              <li><code>utils/</code>: Contains pure helper functions (formatters, transformers, constants). No side effects, no API calls. Also contains <code>supabase.js</code> — the module-local database client helper.</li>
             </ul>
           </div>
           <div className={styles.ruleCol}>
             <p className={styles.ruleHeading}>How They Work Together</p>
             <ul className={styles.ruleList}>
-              <li>Pages trigger actions via hooks or services</li>
-              <li>Hooks call services for business logic</li>
-              <li>Services call repo for data access</li>
-              <li>Repo communicates with Supabase</li>
-              <li>Repo returns data and passes through model mapper</li>
-              <li>Components receive clean, mapped data via props</li>
+              <li><strong>Page</strong> (server) loads data via hook/service, wraps in access gate, passes data to <strong>View</strong></li>
+              <li><strong>View</strong> (client) calls the main hook, spreads its return values to <strong>Components</strong></li>
+              <li><strong>Hook</strong> manages all state, calls services for business logic</li>
+              <li><strong>Services</strong> call repo for data access</li>
+              <li><strong>Repo</strong> communicates with Supabase, returns data through <strong>Model</strong> mapper</li>
+              <li><strong>Components</strong> receive clean, mapped data via props — they never fetch or compute</li>
             </ul>
           </div>
         </div>
         <div style={{ marginTop: "1.5rem", padding: "1rem", backgroundColor: "#f5f5f5", borderRadius: "4px" }}>
           <p className={styles.ruleHeading}>Enforced Data Flow (Mandatory)</p>
-          <pre style={{ fontSize: "0.85rem", overflow: "auto" }}>UI (pages/components)
-  ? hooks
-    ? services
-      ? repo
-        ? Supabase
-          ? model (mapping)</pre>
+          <pre style={{ fontSize: "0.85rem", overflow: "auto" }}>{`Page (server, loads data)
+  → View ("use client", wires hook to components)
+    → Hook (state + handlers)
+      → Services (business logic)
+        → Repo (Supabase queries)
+          → Model (maps DB rows → clean objects)
+
+Why this order?
+  • Pages run on the server = secrets stay safe, data loads fast
+  • Views run on the client = React state, interactivity, "use client"
+  • Hooks hold ALL state = one place to debug, one place to change
+  • Services hold ALL rules = validation lives here, not scattered in UI
+  • Repo is the ONLY layer that calls .from() = easy to find all DB queries
+  • Model maps EVERY read = UI never sees raw DB column names`}</pre>
         </div>
         <div style={{ marginTop: "1.5rem", padding: "1rem", backgroundColor: "#fff3cd", borderRadius: "4px", borderLeft: "4px solid #ff6b6b" }}>
           <p className={styles.ruleHeading}>Strict Rules (Non-Negotiable)</p>
@@ -1458,31 +1589,35 @@ const MODULE_CREATION_STEPS = [
             <div>
               <p style={{ fontWeight: "600", marginBottom: "0.5rem", color: "#d32f2f" }}>NEVER call Supabase (<code>.from()</code>) directly from:</p>
               <ul style={{ marginTop: "0.5rem", paddingLeft: "1.5rem" }}>
-                <li>components</li>
-                <li>pages</li>
-                <li>hooks</li>
+                <li>components (they&apos;re just UI — no data fetching)</li>
+                <li>pages (they delegate to services via hooks)</li>
+                <li>hooks (they call services, not the database)</li>
                 <li>services (use utils/supabase.js to get the client, then pass it to repo)</li>
               </ul>
+              <p style={{ fontSize: "0.85rem", color: "#666", marginTop: "0.5rem" }}>Why? Because if DB calls are everywhere, bugs are impossible to track. One layer = one place to fix.</p>
             </div>
             <div>
               <p style={{ fontWeight: "600", marginBottom: "0.5rem", color: "#d32f2f" }}>NEVER place business logic inside:</p>
               <ul style={{ marginTop: "0.5rem", paddingLeft: "1.5rem" }}>
-                <li>repo</li>
-                <li>components</li>
-                <li>hooks</li>
+                <li>repo (it only does database reads/writes)</li>
+                <li>components (they only render what they&apos;re given)</li>
+                <li>hooks (they manage state, not business rules)</li>
               </ul>
+              <p style={{ fontSize: "0.85rem", color: "#666", marginTop: "0.5rem" }}>Why? Because business rules in UI code get duplicated and forgotten. Keep them in services/ so there&apos;s one source of truth.</p>
             </div>
             <div>
               <p style={{ fontWeight: "600", marginBottom: "0.5rem", color: "#2e7d32" }}>ALWAYS map database responses using:</p>
               <ul style={{ marginTop: "0.5rem", paddingLeft: "1.5rem" }}>
                 <li>model/&lt;module&gt;.model.js</li>
               </ul>
+              <p style={{ fontSize: "0.85rem", color: "#666", marginTop: "0.5rem" }}>Why? If you pass raw DB rows to the UI, a column rename breaks every component. The model is your safety layer.</p>
             </div>
             <div>
               <p style={{ fontWeight: "600", marginBottom: "0.5rem", color: "#2e7d32" }}>ALWAYS centralize workflows inside:</p>
               <ul style={{ marginTop: "0.5rem", paddingLeft: "1.5rem" }}>
                 <li>services/</li>
               </ul>
+              <p style={{ fontSize: "0.85rem", color: "#666", marginTop: "0.5rem" }}>Why? When a feature needs changes (e.g. &quot;add email notification on create&quot;), you change ONE file in services/ instead of hunting through 10 components.</p>
             </div>
           </div>
         </div>
@@ -1582,22 +1717,40 @@ const MODULE_CREATION_STEPS = [
             },
             {
               key: "roles-page",
-              title: "6. PAGE (orchestrator)",
+              title: "6. PAGE (server component — loads data)",
               content: (
                 <div>
                   <p className={styles.stepNote}>
-                    The page composes hooks, components, and service actions into a complete route.
+                    The page is a <strong>server component</strong> (no &quot;use client&quot;). It loads data from the service layer,
+                    wraps the content in <code>ModuleAccessGate</code> (permission check), and passes data to the <strong>View</strong>.
                   </p>
                   <p className={styles.stepNote}>
-                    Think of this as the screen-level coordinator: wire inputs/outputs here, not in shared components.
+                    Think of it as the entry point that says: &quot;load data, check permissions, hand off to the client.&quot;
                   </p>
                   <Snippet code={SNIPPET_ROLES_PAGE} />
                 </div>
               )
             },
             {
+              key: "roles-view",
+              title: "7. VIEW (client layout — wires hook to components)",
+              content: (
+                <div>
+                  <p className={styles.stepNote}>
+                    The view is a <strong>client component</strong> (<code>&quot;use client&quot;</code>). It&apos;s the glue between
+                    the hook and the UI components. It calls your main hook and passes its return values to child components as props.
+                  </p>
+                  <p className={styles.stepNote}>
+                    <strong>Why do we need this?</strong> Because pages are server components (they can&apos;t use React state or hooks),
+                    but your UI needs interactivity. The View bridges that gap — it receives server data as props and enables client-side state.
+                  </p>
+                  <Snippet code={SNIPPET_ROLES_VIEW} />
+                </div>
+              )
+            },
+            {
               key: "roles-index",
-              title: "7. INDEX (module entry)",
+              title: "8. INDEX (module entry)",
               content: (
                 <div>
                   <p className={styles.stepNote}>
@@ -2867,6 +3020,44 @@ function ReferenceTab() {
       ),
     },
     {
+      key: "ref-inline-edit",
+      title: "InlineEditCell",
+      content: (
+        <div className={styles.refBody}>
+          <p className={styles.stepNote}>
+            InlineEditCell makes a table cell clickable and editable. When enabled, users can click the cell text
+            to turn it into an input field, type a new value, and press Enter to confirm. Used for inline row editing
+            across all admin modules (Application Setup, Card Module Setup, etc.).
+          </p>
+          <div className={styles.propGrid}>
+            <RefPropRow prop="value"       required type="string | number" desc="Current value to display in the cell." />
+            <RefPropRow prop="onCommit"    required type="function"        desc="(newValue) => void. Called when editing completes (Enter or blur)." />
+            <RefPropRow prop="disabled"             type="boolean"         desc="When true, cell is read-only. Default: false" />
+            <RefPropRow prop="placeholder"          type="string"          desc="Text shown when value is empty. Default: '--'" />
+            <RefPropRow prop="type"                 type="string"          desc="Input type: 'text' | 'number'. Default: 'text'" />
+          </div>
+          <Snippet title="InlineEditCell usage (real example from Application Setup)" code={`import { InlineEditCell } from "@/shared/components/ui";
+
+// In a TableZ column renderer:
+{
+  key: "app_name",
+  label: "Application Name",
+  render: (row) => (
+    <InlineEditCell
+      value={row?.app_name || ""}
+      onCommit={(val) => handleInlineEdit(row, "app_name", val)}
+      disabled={String(row?.app_id) !== String(editingAppId)}
+    />
+  ),
+}
+
+// The cell shows as normal text when disabled.
+// When enabled (row is in edit mode), it shows a dashed underline.
+// Click it to type. Press Enter or click away to confirm.`} />
+        </div>
+      ),
+    },
+    {
       key: "ref-rules",
       title: "Rules",
       content: (
@@ -3289,6 +3480,65 @@ function TableXTab() {
             </div>
           ),
         },
+        {
+          key: "tablex-databind",
+          title: "9. How It Works Behind the Scenes (Databind)",
+          content: (
+            <div className={styles.refBody}>
+              <p className={styles.stepNote}>
+                TableX is powered by the <strong>databind engine</strong> — a set of generic API routes at <code>/api/databind/</code>
+                that can query, filter, sort, paginate, and export data from <em>any</em> Supabase table.
+                You never call these APIs directly — TableX does it for you.
+              </p>
+              <div style={{ marginTop: "1rem", padding: "1rem", backgroundColor: "#f5f5f5", borderRadius: "4px" }}>
+                <p className={styles.ruleHeading}>What Happens When You Render a TableX</p>
+                <pre style={{ fontSize: "0.85rem", overflow: "auto", margin: 0 }}>{`You write:
+  <TableX source="psb_s_user" columns={["user_id", "first_name", "email"]} />
+
+TableX automatically:
+  1. Calls POST /api/databind/query with:
+     { table: "psb_s_user", fields: ["user_id","first_name","email"], page: 1, pageSize: 50 }
+
+  2. For select filters, calls POST /api/databind/options with:
+     { table: "psb_s_status", key: "status_id", display: "sts_name" }
+
+  3. For export, calls POST /api/databind/export with:
+     { table: "psb_s_user", format: "csv", columns: [...], filters: {...} }
+
+  4. For column discovery, calls GET /api/databind/schema?table=psb_s_user`}</pre>
+              </div>
+              <div style={{ marginTop: "1.5rem" }}>
+                <p className={styles.ruleHeading}>When Do You Need Custom API Routes?</p>
+                <div className={styles.ruleGrid}>
+                  <div className={styles.ruleCol}>
+                    <p style={{ fontWeight: 600, color: "#2e7d32" }}>Use Databind (no custom API)</p>
+                    <ul className={styles.ruleList}>
+                      <li>Show data from a single table</li>
+                      <li>Filter, sort, paginate</li>
+                      <li>Export to CSV / Excel</li>
+                      <li>Load dropdown options from a table</li>
+                    </ul>
+                  </div>
+                  <div className={styles.ruleCol}>
+                    <p style={{ fontWeight: 600, color: "#d32f2f" }}>Write Custom API Route</p>
+                    <ul className={styles.ruleList}>
+                      <li>Multi-step operations (create user + assign role)</li>
+                      <li>Complex validation beyond DB constraints</li>
+                      <li>Cross-table joins or aggregations</li>
+                      <li>Custom business logic (batch save, reorder, etc.)</li>
+                    </ul>
+                  </div>
+                </div>
+              </div>
+              <div style={{ marginTop: "1rem", padding: "1rem", backgroundColor: "#fff3cd", borderRadius: "4px", borderLeft: "4px solid #ffc107" }}>
+                <p style={{ margin: 0, fontSize: "0.9rem" }}>
+                  <strong>Rule of thumb:</strong> Start with TableX + databind. Only create a custom API route when databind cannot do what you need.
+                  Most new modules will never need custom API routes.
+                </p>
+              </div>
+            </div>
+          ),
+        },
       ]} />
     </div>
   );
@@ -3584,14 +3834,87 @@ function TableZTab() {
         },
         {
           key: "table-batch",
-          title: "5. Batch Editing",
+          title: "5. Batch Editing (Draft + Baseline + Diff Pattern)",
           content: (
             <div className={styles.refBody}>
               <p className={styles.stepNote}>
-                Track row changes (create, update, delete) and save them all at once.
-                Changed rows get highlighted automatically.
+                Batch editing lets users make multiple changes (add, edit, delete rows) without saving each one individually.
+                All changes are collected and saved at once when the user clicks &quot;Save Batch&quot;.
               </p>
-              <Snippet title="Code" code={TABLE_SNIPPET_BATCH} />
+              <div style={{ marginTop: "1rem", padding: "1rem", backgroundColor: "#f5f5f5", borderRadius: "4px" }}>
+                <p className={styles.ruleHeading}>How Batch Mode Works (Every Admin Module Uses This)</p>
+                <pre style={{ fontSize: "0.85rem", overflow: "auto", margin: 0 }}>{`1. LOAD: Fetch data from API → store as BASELINE (frozen) + DRAFT (working copy)
+2. EDIT: User adds/edits/deletes rows → changes go to DRAFT only
+3. DIFF: Compare DRAFT vs BASELINE → compute what changed (useMemo)
+4. SHOW: Highlight changed rows (green=new, blue=modified, red=deleted)
+5. SAVE: User clicks "Save Batch" → send only the changes to API
+6. RESET: Reload from server → new BASELINE, DRAFT = clone of BASELINE`}</pre>
+              </div>
+              <Snippet title="Basic Batch Mode" code={TABLE_SNIPPET_BATCH} />
+              <div style={{ marginTop: "1rem", padding: "1rem", backgroundColor: "#fff3cd", borderRadius: "4px", borderLeft: "4px solid #ffc107" }}>
+                <p style={{ margin: 0, fontSize: "0.9rem" }}>
+                  <strong>Key concept:</strong> The <code>__batchState</code> field on each row tells the table how to highlight it.
+                  Values: <code>&quot;created&quot;</code> (green), <code>&quot;updated&quot;</code> (blue), <code>&quot;deleted&quot;</code> (red strikethrough).
+                  Your hook computes this by comparing draft vs baseline.
+                </p>
+              </div>
+            </div>
+          ),
+        },
+        {
+          key: "table-inline-edit",
+          title: "5.1 Inline Editing with InlineEditCell",
+          content: (
+            <div className={styles.refBody}>
+              <p className={styles.stepNote}>
+                <code>InlineEditCell</code> lets users click a table cell to edit its value directly — no modal needed.
+                Used in Application Setup, Card Module Setup, and other admin modules for quick field edits.
+              </p>
+              <div style={{ marginTop: "1rem", padding: "1rem", backgroundColor: "#f5f5f5", borderRadius: "4px" }}>
+                <p className={styles.ruleHeading}>How It Works</p>
+                <pre style={{ fontSize: "0.85rem", overflow: "auto", margin: 0 }}>{`1. Cell shows text normally (read-only)
+2. User clicks the "Edit" row action → row enters edit mode
+3. Cells with InlineEditCell become clickable (dashed underline)
+4. User clicks a cell → it becomes an input field
+5. User types new value → presses Enter or clicks away
+6. onCommit fires → your hook stages the change in the batch
+7. User clicks "Done" → row exits edit mode
+8. All changes saved together via "Save Batch"`}</pre>
+              </div>
+              <Snippet title="InlineEditCell in a Column Renderer" code={`import { InlineEditCell } from "@/shared/components/ui";
+
+// Inside your column definition:
+{
+  key: "app_name",
+  label: "Application",
+  render: (row) => {
+    // Only enable editing for the row currently in edit mode
+    const isEditing = String(row?.app_id) === String(editingAppId);
+
+    return (
+      <InlineEditCell
+        value={row?.app_name || ""}
+        onCommit={(newValue) => onInlineEdit(row, "app_name", newValue)}
+        disabled={!isEditing}
+        placeholder="Enter name"
+      />
+    );
+  },
+}`} />
+              <div className={styles.propGrid}>
+                <RefPropRow prop="value" required type="string | number" desc="Current cell value to display" />
+                <RefPropRow prop="onCommit" required type="function" desc="(newValue) => void. Called when user finishes editing." />
+                <RefPropRow prop="disabled" required={false} type="boolean" desc="When true, cell is read-only (not clickable). Default: false" />
+                <RefPropRow prop="placeholder" required={false} type="string" desc="Shown when value is empty. Default: '--'" />
+                <RefPropRow prop="type" required={false} type="string" desc="Input type: 'text' | 'number'. Default: 'text'" />
+              </div>
+              <div style={{ marginTop: "1rem", padding: "1rem", backgroundColor: "#fff3cd", borderRadius: "4px", borderLeft: "4px solid #ffc107" }}>
+                <p style={{ margin: 0, fontSize: "0.9rem" }}>
+                  <strong>Pattern:</strong> The row&apos;s edit mode is controlled by an <code>editingAppId</code> state in the hook.
+                  Only one row can be in edit mode at a time. The &quot;Edit&quot; action sets it, the &quot;Done&quot; action clears it.
+                  This prevents accidental edits and keeps the UI clean.
+                </p>
+              </div>
             </div>
           ),
         },
@@ -3664,7 +3987,7 @@ function TableZTab() {
         },
         {
           key: "table-when-to-use",
-          title: "10. When to Use TableZ vs TableX",
+          title: "11. When to Use TableZ vs TableX",
           content: (
             <div className={styles.refBody}>
               <div className={styles.ruleGrid}>
