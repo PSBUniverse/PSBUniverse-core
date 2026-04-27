@@ -1,6 +1,6 @@
 # Step-by-Step Git Setup & Push Guide
 
-This guide is for developers who just cloned the **PSB_MetalBuildingsApp** repo and need to set up git, push their work, and sync core updates.
+This guide is for developers who just cloned the **PSB_MetalBuildingsApp** repo and need to set up git, push their work, and sync core updates....
 
 Read each step carefully. Run each command **one at a time**. Do not skip steps.
 
