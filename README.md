@@ -41,19 +41,16 @@ This project uses [`next/font`](https://nextjs.org/docs/app/building-your-applic
 
 ## Documentation
 
-Beginner-proof documentation is available in the `docs/` folder.
+All documentation is in the `docs/` folder, organized by topic.
 
-- [Docs Index](docs/README.md)
-- [Project Overview](docs/PROJECT_OVERVIEW.md)
-- [Core Usage Guide](docs/CORE_USAGE_GUIDE.md)
-- [Module Development Guide](docs/MODULE_DEVELOPMENT_GUIDE.md)
-- [Module Routing Guide](docs/MODULE_ROUTING_GUIDE.md)
-- [Supabase CRUD Guide](docs/SUPABASE_CRUD_GUIDE.md)
-- [Database Naming Conventions](docs/DATABASE_NAMING_CONVENTIONS.md)
-- [Styling Guide](docs/STYLING_GUIDE.md)
-- [JR Developer Guide](docs/Devs/JR_DEV_DEVELOPMENT_GUIDE.md)
-- [PSBUniverse Development Rules (Final)](docs/Devs/PSBUNIVERSE_DEVELOPMENT_RULES_FINAL.md)
-- [Shared UI System Lockdown](docs/Devs/SHARED_UI_SYSTEM_LOCKDOWN.md)
+- [Docs Index](docs/README.md) — Full table of contents
+- [Project Setup](docs/01-getting-started/setup.md) — Install and run locally
+- [Architecture Overview](docs/02-architecture/overview.md) — Auth, RBAC, data flow
+- [Module System](docs/02-architecture/module-system.md) — Build and register modules
+- [Development Rules](docs/03-development-rules/rules.md) — Non-negotiable rules
+- [Shared Components](docs/04-ui-system/shared-components.md) — UI specs and design tokens
+- [CRUD Guide](docs/05-database/crud-guide.md) — Supabase query patterns
+- [Junior Dev Quick Start](docs/08-junior-dev-guide/quickstart.md) — Build your first module
 
 ## Learn More
 

@@ -1,28 +1,49 @@
-# PSBUniverse Docs Index
+# PSBUniverse Documentation
 
-Use this index to find the current architecture and implementation guides.
+Organized reference for the PSBUniverse Core platform. Start at the top and work your way down.
 
-## Core And Platform
+---
 
-- [Project Overview](PROJECT_OVERVIEW.md)
-- [Changelog](CHANGELOG.md)
-- [Core Usage Guide](CORE_USAGE_GUIDE.md)
-- [Supabase CRUD Guide](SUPABASE_CRUD_GUIDE.md)
-- [Database Naming Conventions](DATABASE_NAMING_CONVENTIONS.md)
+## 1. Getting Started
 
-## Module Development
+- [Project Setup](01-getting-started/setup.md) — Install, configure, and run the project locally
+- [Syncing Core Updates](01-getting-started/syncing-core.md) — Pull core updates into downstream app repos
 
-- [Module Development Guide](MODULE_DEVELOPMENT_GUIDE.md)
-- [Module Routing Guide](MODULE_ROUTING_GUIDE.md)
+## 2. Architecture
 
-## Frontend
+- [Architecture Overview](02-architecture/overview.md) — Auth, RBAC, key files, data flow, troubleshooting
+- [Module System](02-architecture/module-system.md) — Module contract, routing, auto-discovery, auth integration
 
-- [Styling Guide](STYLING_GUIDE.md)
-- Shared UI Reference + Playground (route: `/examples`, files in `src/app/examples/page.js` and `src/app/examples/page.module.css`)
-- Data Table Companion Example (route: `/examples/data-table`, files in `src/app/examples/data-table` and `src/app/api/examples/data-table`)
-- [Shared UI System Lockdown](Devs/SHARED_UI_SYSTEM_LOCKDOWN.md)
+## 3. Development Rules
 
-## Team Onboarding
+- [Development Rules](03-development-rules/rules.md) — Non-negotiable rules for UI, modules, RBAC, and tables
 
-- [JR Developer Development Guide](Devs/JR_DEV_DEVELOPMENT_GUIDE.md)
-- [PSBUniverse Development Rules (Final)](Devs/PSBUNIVERSE_DEVELOPMENT_RULES_FINAL.md)
+## 4. UI System
+
+- [Shared Components](04-ui-system/shared-components.md) — Component specs, design tokens, table behavior, styling rules
+- Live reference: `/examples` (dev server) — Shared UI guide, playground, and component reference
+- Data table example: `/examples/data-table` (dev server)
+
+## 5. Database
+
+- [Naming Conventions](05-database/naming-conventions.md) — Table, column, constraint, and index naming standards
+- [CRUD Guide](05-database/crud-guide.md) — Supabase query patterns, error handling, safety rules
+- [CRUD Example](05-database/crud-example.md) — Complete Roles module with model/repo/service/hook/component/page
+
+## 6. Batch Edit
+
+- [Implementation Blueprint](06-batch-edit/blueprint.md) — Draft+Baseline+Diff pattern, save models, edge cases
+- [Table Batch Modes](06-batch-edit/table-batch-modes.md) — TableZ modes, action logic, row behavior rules
+
+## 7. Proposals
+
+- [Auto Module Routing](07-proposals/auto-module-routing.md) — Implemented: auto-discovery replaces hardcoded pageImporters
+
+## 8. Junior Developer Guide
+
+- [Quick Start](08-junior-dev-guide/quickstart.md) — Build your first module (beginner-friendly walkthrough)
+- [Full Guide](08-junior-dev-guide/full-guide.md) — Complete rulebook: permissions, RBAC, database, UI, PR checklist
+
+## Reference
+
+- [Changelog](CHANGELOG.md) — Release history and behavior changes

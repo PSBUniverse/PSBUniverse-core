@@ -1,24 +1,35 @@
-🧠 REAL MODULE EXAMPLE — roles
-________________________________________
-📁 STRUCTURE
+# CRUD Example: Roles Module
+
+A complete, working example of a module with full CRUD operations. Use this as a template when building your own module's data layer.
+
+---
+
+## Folder Structure
+
+```
 src/modules/roles/
-  src/
-    index.js
-    pages/
-      RolesPage.jsx
-    components/
-      RolesTable.jsx
-    services/
-      useRoles.js
-    repo/
-      roles.repo.js
-    model/
-      roles.model.js
-    hooks/
-      useRolesTable.js
-    utils/
-________________________________________
-🧱 1. MODEL (maps DB → UI)
+  index.js
+  pages/
+    RolesPage.jsx
+  components/
+    RolesTable.jsx
+  services/
+    useRoles.js
+  repo/
+    roles.repo.js
+  model/
+    roles.model.js
+  hooks/
+    useRolesTable.js
+```
+
+---
+
+## 1. Model — Maps Database Columns to UI Fields
+
+The model is a simple function that converts a raw database row into the shape your UI expects. This is your **protection layer** — if the database schema changes, you only update this one file.
+
+```js
 // model/roles.model.js
 
 export function mapRole(row) {
@@ -27,20 +38,26 @@ export function mapRole(row) {
     name: row.role_name,
     description: row.role_desc,
     isActive: row.is_active,
-    createdAt: row.created_at
+    createdAt: row.created_at,
   };
 }
-________________________________________
-🧱 2. REPO (Supabase only)
+```
+
+---
+
+## 2. Repo — Supabase Queries Only
+
+The repo is the only place that talks to Supabase. It sends queries and returns mapped data. No business logic here.
+
+```js
 // repo/roles.repo.js
 
-import { supabase } from "@/core/supabaseClient";
+import { supabase } from "@/core/supabase/client";
 import { mapRole } from "../model/roles.model";
 
 const TABLE = "psb_s_role";
 
 export const rolesRepo = {
-
   async getAll() {
     const { data, error } = await supabase
       .from(TABLE)
@@ -48,7 +65,6 @@ export const rolesRepo = {
       .order("created_at", { ascending: false });
 
     if (error) throw new Error(error.message);
-
     return data.map(mapRole);
   },
 
@@ -58,13 +74,12 @@ export const rolesRepo = {
       .insert({
         role_name: payload.name,
         role_desc: payload.description,
-        is_active: true
+        is_active: true,
       })
       .select("*")
       .single();
 
     if (error) throw new Error(error.message);
-
     return mapRole(data);
   },
 
@@ -75,14 +90,13 @@ export const rolesRepo = {
         role_name: payload.name,
         role_desc: payload.description,
         is_active: payload.isActive,
-        updated_at: new Date()
+        updated_at: new Date(),
       })
       .eq("role_id", payload.id)
       .select("*")
       .single();
 
     if (error) throw new Error(error.message);
-
     return mapRole(data);
   },
 
@@ -93,18 +107,23 @@ export const rolesRepo = {
       .eq("role_id", id);
 
     if (error) throw new Error(error.message);
-
     return true;
-  }
+  },
 };
-________________________________________
-🧱 3. SERVICE (business layer)
+```
+
+---
+
+## 3. Service — Business Validation
+
+The service adds any business rules on top of the repo. For simple modules this may be thin, but it's the right place for validation.
+
+```js
 // services/useRoles.js
 
 import { rolesRepo } from "../repo/roles.repo";
 
 export const useRolesService = {
-
   async getRoles() {
     return await rolesRepo.getAll();
   },
@@ -120,10 +139,17 @@ export const useRolesService = {
 
   async deleteRole(id) {
     return await rolesRepo.delete(id);
-  }
+  },
 };
-________________________________________
-🧱 4. HOOK (UI state control)
+```
+
+---
+
+## 4. Hook — UI State Management
+
+The hook connects the service to React state. Components use the hook instead of calling the service directly.
+
+```js
 // hooks/useRolesTable.js
 
 import { useEffect, useState } from "react";
@@ -143,11 +169,18 @@ export function useRolesTable() {
 
   return {
     data,
-    reload: load
+    reload: load,
   };
 }
-________________________________________
-🧱 5. COMPONENT (pure UI)
+```
+
+---
+
+## 5. Component — Pure UI
+
+The component renders data and calls callbacks. It has no knowledge of where data comes from.
+
+```js
 // components/RolesTable.jsx
 
 export default function RolesTable({ data, onDelete }) {
@@ -161,7 +194,7 @@ export default function RolesTable({ data, onDelete }) {
         </tr>
       </thead>
       <tbody>
-        {data.map(role => (
+        {data.map((role) => (
           <tr key={role.id}>
             <td>{role.name}</td>
             <td>{role.isActive ? "Active" : "Inactive"}</td>
@@ -174,8 +207,15 @@ export default function RolesTable({ data, onDelete }) {
     </table>
   );
 }
-________________________________________
-🧱 6. PAGE (orchestrator)
+```
+
+---
+
+## 6. Page — Orchestrator
+
+The page wires everything together. It uses the hook for data and the service for actions.
+
+```js
 // pages/RolesPage.jsx
 
 import RolesTable from "../components/RolesTable";
@@ -197,29 +237,42 @@ export default function RolesPage() {
     </div>
   );
 }
-________________________________________
-🧱 7. INDEX (module entry)
+```
+
+---
+
+## 7. Module Index
+
+```js
 // index.js
 
-import RolesPage from "./pages/RolesPage";
-
 export default {
-  route: "/roles",
-  component: RolesPage
+  key: "roles",
+  app_id: 1,
+  name: "Roles",
+  routes: [
+    { path: "/roles", page: "RolesPage" },
+  ],
 };
-________________________________________
-🔗 WHAT THIS PROVES
-This is now:
-•	✔ Real DB (your table) 
-•	✔ Real CRUD 
-•	✔ Clean separation 
-•	✔ No overengineering 
-•	✔ No DTO/interface bloat 
-•	✔ Still scalable 
-________________________________________
-💣 Important (don’t miss this)
-This line:
-return data.map(mapRole);
-👉 That’s your entire protection layer
-Remove that → your system degrades fast.
+```
 
+---
+
+## Why This Structure Works
+
+| Layer | Responsibility | Depends On |
+|-------|---------------|------------|
+| Model | Maps DB columns → UI fields | Nothing |
+| Repo | Sends Supabase queries, returns mapped data | Model |
+| Service | Business rules and validation | Repo |
+| Hook | Connects service to React state | Service |
+| Component | Renders UI, calls callbacks | Nothing (pure props) |
+| Page | Wires hook + service + component together | Hook, Service, Component |
+
+The key line is:
+
+```js
+return data.map(mapRole);
+```
+
+That's your entire protection layer between the database and your UI. Remove it and your system degrades fast.

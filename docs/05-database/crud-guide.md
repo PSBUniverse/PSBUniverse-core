@@ -1,36 +1,32 @@
 # Supabase CRUD Guide
 
-## Document Purpose
-This guide explains how to perform reliable CRUD operations in PSBUniverse Core using Supabase.
+This guide shows how to perform reliable database operations in PSBUniverse Core using Supabase. Follow these patterns for every query you write.
 
-It covers:
-1. Which Supabase client to use
-2. How to write SELECT/INSERT/UPDATE/DELETE operations
-3. How to handle errors and edge cases
-4. How to stay aligned with core auth and RBAC architecture
+---
 
-## 1) Choose the Correct Supabase Client
+## Which Supabase Client to Use
 
-PSBUniverse Core uses two Supabase clients.
+PSBUniverse has **two** Supabase clients. Using the wrong one is a security risk.
 
-| Client | File | Use Case |
-|---|---|---|
-| Browser/client singleton | src/core/supabase/client.js | User session actions, client-safe reads tied to logged-in user |
-| Server admin singleton | src/core/supabase/admin.js | Privileged operations (create users, managed inserts across tables) |
+| Client | File | When to Use |
+|--------|------|-------------|
+| Browser client | `src/core/supabase/client.js` | Client components — reads tied to the logged-in user's session |
+| Server admin client | `src/core/supabase/admin.js` | API routes and server-only code — privileged operations like creating users |
 
-Rule:
-1. Never expose service role key in browser code.
-2. Never use admin client in client components.
+**Rules:**
+1. Never expose the service role key in browser code.
+2. Never use the admin client in client components.
 
-## 2) Common Query Pattern
+---
 
-Use a consistent pattern for every operation:
-1. Execute query
-2. Check error
-3. Validate data shape
-4. Return predictable result
+## Standard Query Pattern
 
-Example pattern:
+Use the same pattern for every operation:
+
+1. Execute the query.
+2. Check `error`.
+3. Validate the data shape.
+4. Return a predictable result.
 
 ```js
 const { data, error } = await supabase
@@ -46,9 +42,11 @@ if (error) {
 return data ?? null;
 ```
 
-## 3) SELECT Examples
+---
 
-### 3.1 Resolve business user from auth identity
+## SELECT Examples
+
+### Resolve Business User from Auth Identity
 
 ```js
 const { data: dbUser, error } = await supabase
@@ -60,11 +58,7 @@ const { data: dbUser, error } = await supabase
 if (error) throw new Error(error.message);
 ```
 
-Why:
-1. auth.users is identity source.
-2. psb_s_user is business profile source.
-
-### 3.2 Load active app-role mappings
+### Load Active App-Role Mappings
 
 ```js
 const { data: roles, error } = await supabase
@@ -76,11 +70,7 @@ const { data: roles, error } = await supabase
 if (error) throw new Error(error.message);
 ```
 
-Why:
-1. Core app access is role-based and app_id-scoped.
-2. Only active mappings should authorize access.
-
-### 3.3 Load cards for one application
+### Load Cards for One Application
 
 ```js
 const { data: cards, error } = await supabase
@@ -93,7 +83,7 @@ const { data: cards, error } = await supabase
 if (error) throw new Error(error.message);
 ```
 
-### 3.4 Load card groups for ordering context
+### Load Card Groups
 
 ```js
 const { data: groups, error } = await supabase
@@ -106,7 +96,7 @@ const { data: groups, error } = await supabase
 if (error) throw new Error(error.message);
 ```
 
-### 3.5 Load active card-role mappings
+### Load Card-Role Mappings
 
 ```js
 const { data: cardRoleAccess, error } = await supabase
@@ -117,9 +107,9 @@ const { data: cardRoleAccess, error } = await supabase
 if (error) throw new Error(error.message);
 ```
 
-### 3.6 Resolve auth user from cookie token (server route)
+### Resolve Auth User from Cookie Token (Server Route)
 
-Pattern used by `/api/me/bootstrap`:
+This pattern is used by `/api/me/bootstrap`:
 
 ```js
 import { cookies } from "next/headers";
@@ -140,15 +130,13 @@ if (error || !authData?.user) {
 }
 ```
 
-Why:
-1. Server routes must re-resolve identity from cookie token.
-2. This enables middleware-safe and refresh-safe auth bootstrap.
+---
 
-## 4) INSERT Examples
+## INSERT Examples
 
-### 4.1 Insert business user after auth user creation
+### Insert Business User (After Auth User Creation)
 
-Use server admin flow from src/core/auth/createBusinessUser.js.
+Uses the server admin flow from `src/core/auth/createBusinessUser.js`:
 
 ```js
 const { data: dbUser, error } = await supabaseAdmin
@@ -163,11 +151,7 @@ const { data: dbUser, error } = await supabaseAdmin
   .single();
 ```
 
-Why:
-1. Keep UUID to INT bridge in psb_s_user.
-2. Preserve existing INT foreign key model across business tables.
-
-### 4.2 Insert user role mappings
+### Insert User Role Mappings
 
 ```js
 const rows = selectedRoleRows.map((row) => ({
@@ -185,9 +169,11 @@ const { data, error } = await supabaseAdmin
 if (error) throw new Error(error.message);
 ```
 
-## 5) UPDATE Examples
+---
 
-### 5.1 Update user profile fields
+## UPDATE Examples
+
+### Update User Profile
 
 ```js
 const { data, error } = await supabase
@@ -204,7 +190,7 @@ const { data, error } = await supabase
 if (error) throw new Error(error.message);
 ```
 
-### 5.2 Soft-disable app access mapping
+### Soft-Disable App Access
 
 ```js
 const { error } = await supabaseAdmin
@@ -220,11 +206,13 @@ const { error } = await supabaseAdmin
 if (error) throw new Error(error.message);
 ```
 
-## 6) DELETE Examples
+---
 
-Use hard delete carefully. Prefer soft disable where governance history matters.
+## DELETE Examples
 
-### 6.1 Delete one card-role mapping
+Prefer soft disable (update `is_active = false`) where audit history matters. Use hard delete only when appropriate.
+
+### Delete Card-Role Mapping
 
 ```js
 const { error } = await supabaseAdmin
@@ -236,7 +224,7 @@ const { error } = await supabaseAdmin
 if (error) throw new Error(error.message);
 ```
 
-### 6.2 Delete business user in rollback path
+### Delete Business User (Rollback Path)
 
 ```js
 const { error } = await supabaseAdmin
@@ -247,15 +235,17 @@ const { error } = await supabaseAdmin
 if (error) throw new Error(error.message);
 ```
 
-## 7) Error Handling Best Practices
+---
 
-1. Always check error explicitly.
+## Error Handling Best Practices
+
+1. **Always check `error` explicitly.** Never skip it.
 2. Throw or return structured error messages.
-3. Validate data shape (array, maybeSingle, single) before use.
-4. Add rollback when operation spans multiple tables.
+3. Validate data shape (`array`, `maybeSingle`, `single`) before using the result.
+4. Add rollback logic when operations span multiple tables.
 5. Never silently swallow Supabase errors.
 
-Robust multi-step example:
+### Multi-Step Example with Rollback
 
 ```js
 try {
@@ -269,32 +259,34 @@ try {
 }
 ```
 
-## 8) Query Safety and Performance Rules
+---
 
-1. Always filter by keys (user_id, app_id, role_id, card_id) where applicable.
-2. Always include is_active when access logic depends on active status.
-3. Use maybeSingle only when zero or one row is expected.
-4. Use single only when exactly one row is required.
-5. Keep SELECT columns focused in high-traffic paths.
-6. Do not run duplicate auth/role queries in many components; use central context.
-7. For server bootstrap endpoints, send no-store cache headers for session-coupled payloads.
+## Query Safety Rules
 
-## 9) Anti-Patterns to Avoid
+1. Always filter by keys (`user_id`, `app_id`, `role_id`, `card_id`).
+2. Always include `is_active` when access logic depends on active status.
+3. Use `maybeSingle()` only when zero or one row is expected.
+4. Use `single()` only when exactly one row is required.
+5. Keep `SELECT` columns focused in high-traffic paths.
+6. Do not run duplicate auth/role queries — use `useAuth()` central context.
+7. For server bootstrap endpoints, send no-store cache headers.
 
-1. Using auth_user_id for all business joins.
+---
+
+## Anti-Patterns to Avoid
+
+1. Using `auth_user_id` for business joins (use `user_id` instead).
 2. Hardcoding role names in UI checks.
-3. Loading roles repeatedly in each page/component.
-4. Writing custom password handling in psb_s_user.
-5. Running privileged write logic from browser code.
+3. Loading roles repeatedly in each component.
+4. Writing custom password handling in `psb_s_user`.
+5. Running privileged writes from browser code.
 
-## 10) Practical CRUD Checklist
+---
 
-Before merging any CRUD feature:
+## Checklist Before Merging CRUD Code
 
-1. Correct client selected (browser vs admin).
-2. Query uses correct table keys and active filters.
-3. Error paths are handled explicitly.
-4. Multi-step write operations include rollback strategy.
-5. Access-sensitive queries align with core RBAC model.
-
-This keeps data operations safe, auditable, and aligned with PSBUniverse Core architecture.
+- [ ] Correct Supabase client selected (browser vs admin).
+- [ ] Query uses correct table keys and `is_active` filters.
+- [ ] Error paths are handled explicitly.
+- [ ] Multi-step writes include rollback strategy.
+- [ ] Access-sensitive queries align with core RBAC model.

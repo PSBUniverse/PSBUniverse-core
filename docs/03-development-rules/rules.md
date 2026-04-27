@@ -1,0 +1,299 @@
+# Development Rules
+
+These are the non-negotiable rules for building anything inside PSBUniverse. Every developer — junior or senior — must follow these.
+
+Breaking these rules can break RBAC, module consistency, and platform stability.
+
+---
+
+## Core Principles
+
+1. **Modules do not define systems.** Modules only build features.
+2. **Shared components are the single source of truth.** All UI comes from `shared/components/ui`.
+3. **Logic lives in the module, not inside shared UI components.** The module controls data, filters, and state. Shared components render and emit events.
+4. **Core is infrastructure.** It handles auth, RBAC, routing, and layout. Modules consume core services — they don't replace them.
+
+---
+
+## UI Rules
+
+### Do
+
+- Import all UI from `@/shared/components/ui`:
+
+  ```js
+  import { Button, Table, Modal } from "@/shared/components/ui";
+  ```
+
+- Follow consistent spacing, layout, and styling.
+- Handle all UI states: loading, empty, error, no-access.
+
+### Do Not
+
+- Create your own `Button`, `Modal`, or `Table` inside a module.
+- Use random inline styles.
+- Override shared component styles from module code.
+- Redesign the app shell layout.
+
+---
+
+## Module Rules
+
+### Structure
+
+```
+src/modules/<module-name>/
+  index.js
+  pages/
+  components/
+```
+
+### Module Is Responsible For
+
+- Defining pages
+- Managing state
+- Fetching data
+- Defining filters
+- Configuring the table
+
+### Module Must Not
+
+- Modify core
+- Implement auth
+- Implement RBAC logic
+- Create system-level components
+
+---
+
+## RBAC Rules
+
+### RBAC Controls
+
+- Access to modules (app-level)
+- Access to features/actions (card-level)
+- Whether columns exist in a table
+- Whether a table is visible at all
+
+### RBAC Must Not
+
+- Exist inside UI components
+- Exist inside Table logic
+
+Correct:
+
+```js
+if (!canViewTable) return null;
+```
+
+Wrong:
+
+```js
+// Inside Table.js
+if (row.role !== "Admin") hideColumn("salary");  // NO
+```
+
+---
+
+## Table Rules
+
+The shared `Table` component is a **controlled, display-only renderer**. The module owns all data and logic.
+
+### Standard Table Features
+
+The shared table supports all of these out of the box:
+
+1. Sorting
+2. Global search
+3. Pagination
+4. Filters (hardcoded or databound)
+5. Column resize
+6. Column visibility
+7. Row actions
+8. Export (CSV or Excel)
+9. Loading and empty states
+
+### Required Behavior
+
+- Table is **controlled by parent** — all data passed via props.
+- All events (sort, filter, page, search) are handled by the parent module.
+- Source of truth for sort, pagination, filters, and column state lives in the module.
+
+### Not Allowed
+
+- Table fetches its own data.
+- Table manages business logic.
+- Table stores state internally.
+- Passing manual children rows.
+
+### Standard Table Props
+
+```js
+<Table
+  columns={columns}
+  data={data}
+  loading={loading}
+  total={total}
+  page={page}
+  pageSize={pageSize}
+  filters={filtersConfig}
+  appliedFilters={appliedFilters}
+  sort={sort}
+  onFilterChange={handleFilterChange}
+  onSortChange={handleSortChange}
+  onPageChange={handlePageChange}
+  onSearchChange={handleSearch}
+  onColumnVisibilityChange={handleColumnVisibilityChange}
+  onColumnResizeChange={handleColumnResizeChange}
+  actions={actions}
+  onExport={handleExport}
+/>
+```
+
+### Filter Rules
+
+- Filters **must** be defined in the module and passed to the table.
+- The table renders filter controls and emits changes — it does not define or fetch filters.
+- Databound filter options are fetched by the module and passed as `options`.
+
+```js
+const filtersConfig = [
+  { key: "status", label: "Status", type: "select", options: [...] },
+  { key: "app_id", label: "Application", type: "select", dataSource: fetchApps, options: appOptions },
+];
+```
+
+### Column Visibility
+
+- **UI** controls visibility (user toggles columns on/off).
+- **RBAC** controls existence (module decides which columns are in the array at all).
+
+### Column Resize
+
+- Drag to resize column width.
+- Enforce minimum width.
+- Table emits resize changes; module persists width state and re-passes `columns`.
+
+### Row Actions
+
+Actions are config-driven, not hardcoded:
+
+```js
+const actions = [
+  { label: "Edit", onClick: handleEdit },
+  { label: "Delete", onClick: handleDelete, variant: "danger" },
+];
+```
+
+**Row action `type` values are limited to:** `primary`, `secondary`, `danger`.
+Do not pass `success` or `warning` to row actions. If your business meaning is success/warning, map it to a supported type.
+
+### Table Customization (Allowed)
+
+Beyond the standard features, these customizations are allowed:
+
+1. **Action columns** — config-driven row actions via the `actions` prop.
+2. **Checkbox selection** — row selection for batch operations.
+3. **Row click** — open a side panel or detail view on row click.
+4. **Master-detail view** — expandable row detail within the table.
+
+Anything outside this list must be proposed and approved before implementation.
+
+### Companion Example
+
+The blessed reference implementation is at:
+
+- **Page route:** `/examples/data-table`
+- **Page file:** `src/app/examples/data-table/page.js`
+- **Data API:** `GET /api/examples/data-table`
+- **Filter options API:** `GET /api/examples/data-table/options`
+- **Export API:** `GET /api/examples/data-table/export`
+
+---
+
+## Development Flow
+
+### Junior Developer Flow
+
+1. Copy an existing module folder as a template.
+2. Update `index.js` with your module's key, app_id, name, and routes.
+3. Register database records (app, groups, cards, card-role mappings).
+4. Build pages and components.
+5. Apply card access checks.
+6. Test with authorized and unauthorized users.
+
+### Senior Developer Flow
+
+1. Review module contract and routing before code review.
+2. Validate RBAC setup in database matches module expectations.
+3. Verify shared component usage (no custom overrides).
+4. Check that all table state is controlled by the module.
+5. Confirm build and lint pass.
+
+---
+
+## Final Mental Model
+
+| Concept | Role |
+|---------|------|
+| **Core** | The brain — auth, RBAC, routing, layout |
+| **Modules** | The features — domain pages, workflows, data |
+| **Shared Table** | The renderer — display-only, controlled, no business logic |
+
+### Done Criteria
+
+Your module is done when:
+
+1. Module structure follows the required pattern.
+2. RBAC is enforced (app-level by core, card-level by your module).
+3. All UI uses shared components.
+4. Table state is fully controlled by the module.
+5. Build passes, lint passes.
+6. Authorized and unauthorized user flows work correctly.
+
+### Export
+
+- Server-side only.
+- Uses current filtered data context.
+- CSV and Excel only.
+
+### Reference Implementation
+
+- Live example: `/examples/data-table`
+- Page file: `src/app/examples/data-table/page.js`
+- Data API: `GET /api/examples/data-table`
+- Filter options API: `GET /api/examples/data-table/options`
+- Export API: `GET /api/examples/data-table/export`
+
+For the full shared UI guide and playground, visit `/examples` in the dev server.
+
+---
+
+## Hard Rules (Non-Negotiable)
+
+### Do Not
+
+1. Install table libraries inside modules.
+2. Build custom tables per page.
+3. Fetch data inside the Table component.
+4. Mix RBAC with UI logic.
+5. Duplicate shared UI components.
+
+### Must
+
+1. Use the shared Table component.
+2. Pass all data via props.
+3. Keep logic in the module.
+4. Keep UI rendering in shared components.
+
+---
+
+## Escalation Rule
+
+If your work requires changing any of these:
+
+1. Auth flow
+2. RBAC model
+3. Role governance
+4. Core route guard logic
+
+**Stop and escalate to the technical lead.** Do not make architecture changes inside module tasks.
