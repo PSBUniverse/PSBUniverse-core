@@ -121,11 +121,11 @@ git remote -v
 
 You should now see FOUR lines:
 
-```
-core    https://github.com/PSBUniverse/PSBUniverse-core.git (fetch)
-core    no_push_allowed (push)
-origin  https://github.com/PSBUniverse/PSB_MetalBuildingsApp.git (fetch)
-origin  https://github.com/PSBUniverse/PSB_MetalBuildingsApp.git (push)
+```bash
+# core    https://github.com/PSBUniverse/PSBUniverse-core.git (fetch)
+# core    no_push_allowed (push)
+# origin  https://github.com/PSBUniverse/PSB_MetalBuildingsApp.git (fetch)
+# origin  https://github.com/PSBUniverse/PSB_MetalBuildingsApp.git (push)
 ```
 
 ### Step 12: Fetch the core and create the core-main branch
